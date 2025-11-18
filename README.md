@@ -61,8 +61,6 @@ Security & best practices
 - Use WordPress application passwords where possible.
 - Do not commit secrets to git; prefer environment variables or a secret manager for production.
 
-If you'd like, I can also:
-- Run the demo and capture the output here.
-- Run the specific test file locally and report results.
+
 
 
