@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { ScheduledPost } from './useScheduledPosts';
 
 /**
- * Mock hook for saving scheduled posts - stores in localStorage instead of Firestore
+ * Hook for saving scheduled posts to backend API
  */
 export const useMockSaveScheduledPost = (db: any, userId: string | null) => {
   const saveScheduledPost = useCallback(async (
@@ -19,37 +19,35 @@ export const useMockSaveScheduledPost = (db: any, userId: string | null) => {
     const [h, m] = timeKey.split(':');
     const timeFormatted = `${h.padStart(2, '0')}:${m}`;
     const dateTime = `${date}T${timeFormatted}:00`;
-    
-    // Generate a mock ID
-    const postId = `mock-post-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    
-    const newPost: ScheduledPost = {
-      id: postId,
-      platform,
-      content,
-      dateTime,
-      status: 'Scheduled',
-      imageUrl: imageUrl || null,
-      createdAt: new Date().toISOString(),
-    };
 
     try {
-      // Load existing posts
-      const stored = localStorage.getItem(`mock_scheduled_posts_${userId}`);
-      const existingPosts: ScheduledPost[] = stored ? JSON.parse(stored) : [];
-      
-      // Add new post
-      existingPosts.push(newPost);
-      
-      // Save back to localStorage
-      localStorage.setItem(`mock_scheduled_posts_${userId}`, JSON.stringify(existingPosts));
+      // Call backend API to save scheduled post
+      const response = await fetch('/api/scheduled-posts/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          platform: platform,
+          content: content,
+          date_time: dateTime,
+          image_url: imageUrl,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save scheduled post');
+      }
+
+      const data = await response.json();
       
       return { 
         success: true, 
-        message: `Post for ${platform} successfully scheduled! View on Dashboard.` 
+        message: data.message || `Post for ${platform} successfully scheduled! View on Dashboard.` 
       };
     } catch (error: any) {
-      console.error("Error saving mock post:", error);
+      console.error("Error saving scheduled post:", error);
       throw new Error(`Failed to schedule post: ${error.message}`);
     }
   }, [userId]);
