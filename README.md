@@ -35,6 +35,9 @@ GOOGLE_API_KEY=your_google_key_if_used
 WP_SITE=https://yourwpsite.com
 WP_USER=your_wp_username_or_app_password
 WP_PASSWORD=your_wp_password_or_app_password
+NANOBANANA_API_KEY=your_nanobanana_key
+NANOBANANA_API_URL=https://api.nanobanana.com/v1/generate
+PORT=8000
 ```
 - If `WP_SITE`, `WP_USER`, and `WP_PASSWORD` are set, the publishing tool will attempt to POST to WordPress. Otherwise, mock scheduling is used.
 
@@ -42,6 +45,19 @@ Run the demo (local)
 ```powershell
 python -m ghostwriter_agent.agent
 ```
+
+Backend API Server
+- Install backend dependencies:
+```bash
+pip install -r requirements.txt
+```
+- Run the FastAPI backend:
+```bash
+python run_backend.py
+# Or: uvicorn backend.main:app --reload --port 8000
+```
+- API documentation available at: http://localhost:8000/docs
+- The frontend is configured to proxy `/api/*` requests to the backend
 
 Testing
 - Run tests with:
