@@ -473,3 +473,96 @@ async def delete_scheduled_post(user_id: str, post_id: str):
         raise HTTPException(status_code=500, detail=f"Error deleting scheduled post: {str(e)}")
 
 
+@router.post("/scheduled-posts/publish-wordpress/{user_id}/{post_id}")
+async def publish_to_wordpress(user_id: str, post_id: str):
+    """Publish a scheduled post to WordPress."""
+    try:
+        # Get WordPress credentials from environment
+        wp_site = os.getenv("WP_SITE")
+        wp_user = os.getenv("WP_USER")
+        wp_password = os.getenv("WP_PASSWORD")
+        
+        if not all([wp_site, wp_user, wp_password]):
+            raise HTTPException(
+                status_code=400, 
+                detail="WordPress credentials not configured. Please set WP_SITE, WP_USER, and WP_PASSWORD in .env"
+            )
+        
+        # Load the post
+        posts = _load_user_posts(user_id)
+        post = next((p for p in posts if p.get("id") == post_id), None)
+        
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        # Only publish WordPress posts
+        if post.get("platform", "").lower() != "wordpress":
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Can only publish WordPress posts. This is a {post.get('platform')} post."
+            )
+        
+        # Publish to WordPress
+        import requests
+        from requests.auth import HTTPBasicAuth
+        
+        wp_url = f"{wp_site.rstrip('/')}/wp-json/wp/v2/posts"
+        
+        # Extract title from content or use date
+        content = post.get("content", "")
+        title = content.split('\n')[0][:100] if content else f"Post from {datetime.utcnow().strftime('%B %d, %Y')}"
+        
+        # Remove HTML tags from title if present
+        import re
+        title = re.sub(r'<[^>]+>', '', title).strip()
+        
+        payload_wp = {
+            "title": title,
+            "content": content,
+            "status": "publish",  # or "draft" for testing
+        }
+        
+        resp = requests.post(
+            wp_url, 
+            json=payload_wp, 
+            auth=HTTPBasicAuth(wp_user, wp_password),
+            timeout=30
+        )
+        
+        if resp.status_code in (200, 201):
+            # Update post status
+            for p in posts:
+                if p.get("id") == post_id:
+                    p["status"] = "Published"
+                    p["publishedAt"] = datetime.utcnow().isoformat()
+                    if resp.headers.get("content-type", "").startswith("application/json"):
+                        wp_data = resp.json()
+                        p["wordpressUrl"] = wp_data.get("link", "")
+                        p["wordpressId"] = wp_data.get("id", "")
+            
+            _save_user_posts(user_id, posts)
+            
+            return {
+                "success": True,
+                "message": "Post published to WordPress successfully!",
+                "post": next((p for p in posts if p.get("id") == post_id), None)
+            }
+        else:
+            error_detail = resp.text
+            try:
+                error_data = resp.json()
+                error_detail = error_data.get("message", resp.text)
+            except:
+                pass
+            
+            raise HTTPException(
+                status_code=resp.status_code,
+                detail=f"WordPress API error: {error_detail}"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error publishing to WordPress: {str(e)}")
+
+

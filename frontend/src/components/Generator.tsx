@@ -207,7 +207,14 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
       )}
 
       {currentView === 'dashboard' && (
-        <ScheduledPostsDashboard posts={scheduledPosts} />
+        <ScheduledPostsDashboard 
+          posts={scheduledPosts} 
+          userId={userId}
+          onPostUpdated={() => {
+            // Force refresh by re-fetching posts
+            // The hook will automatically update due to polling
+          }}
+        />
       )}
 
       <Footer userId={userId} />

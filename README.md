@@ -128,6 +128,11 @@ npm run dev
   
 - **DELETE** `/api/scheduled-posts/{user_id}/{post_id}` - Delete a scheduled post
 
+- **POST** `/api/scheduled-posts/publish-wordpress/{user_id}/{post_id}` - Publish a WordPress post directly
+  - Requires: `WP_SITE`, `WP_USER`, `WP_PASSWORD` in `.env`
+  - Updates post status to "Published"
+  - Returns WordPress post URL
+
 ### WordPress
 - **POST** `/api/check-wordpress` - Verify if a URL is a WordPress site
   - Body: `{ "url": string }`
@@ -148,15 +153,17 @@ npm run dev
 
 ### ✅ Connected to Backend
 - **Real Firebase Authentication** - Email/password sign-up and login
-- Content generation (AI-powered)
-- Image generation (nanobanana)
-- Scheduled posts (persistent storage)
-- WordPress site verification
+- **Content generation** - AI-powered content for all platforms
+- **Image generation** - nanobanana integration
+- **Scheduled posts** - Persistent storage with dashboard
+- **WordPress auto-publish** - One-click publishing from dashboard
+- **WordPress site verification** - Check if a URL is WordPress
 
 ### 🔄 Coming Soon
 - Social media auto-posting (LinkedIn, Instagram, Facebook)
 - Email verification for new users
 - Password reset functionality
+- Scheduled auto-posting at specific times
 
 ---
 
@@ -230,6 +237,13 @@ ghostwriter_agent/
 - ✅ User session management
 - ✅ Secure authentication state handling
 - ✅ User-friendly error messages
+
+### WordPress Publishing
+- ✅ One-click WordPress publishing from scheduled posts dashboard
+- ✅ Automatic post status updates
+- ✅ WordPress post URL tracking
+- ✅ Delete scheduled posts
+- ✅ Error handling for WordPress API
 
 ### Backend Integration
 - ✅ Connected content generation to backend AI agents
