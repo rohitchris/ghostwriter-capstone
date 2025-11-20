@@ -25,6 +25,7 @@ const initialImageSettings: ImageSettings = {
 
 export const useImageSettings = () => {
   const [imageSettings, setImageSettings] = useState<ImageSettings>(initialImageSettings);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
   const handleImageSettingChange = (platform: keyof ImageSettings, field: string, value: any) => {
     if (platform === 'prompt') {
@@ -40,6 +41,48 @@ export const useImageSettings = () => {
     }
   };
 
+  const generateImage = async (platform: 'linkedin' | 'wordpress' | 'instagram') => {
+    const settings = imageSettings[platform];
+    if (settings.mode !== 'GENERATE' || !imageSettings.prompt) {
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          prompt: imageSettings.prompt,
+          style: settings.style,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate image');
+      }
+
+      const data = await response.json();
+      
+      // Update the platform's generatedUrl with the result
+      setImageSettings(prev => ({
+        ...prev,
+        [platform]: {
+          ...prev[platform],
+          generatedUrl: data.url || data.image_url || null,
+        }
+      }));
+
+      setIsGenerating(false);
+      return data;
+    } catch (error) {
+      setIsGenerating(false);
+      throw error;
+    }
+  };
+
   const isImageGenerationActive = ['linkedin', 'wordpress', 'instagram'].some(
     p => imageSettings[p as keyof ImageSettings]?.mode === 'GENERATE'
   );
@@ -47,6 +90,8 @@ export const useImageSettings = () => {
   return {
     imageSettings,
     handleImageSettingChange,
+    generateImage,
+    isGenerating,
     isImageGenerationActive,
   };
 };

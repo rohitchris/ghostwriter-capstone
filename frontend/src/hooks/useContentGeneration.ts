@@ -25,29 +25,47 @@ export const useContentGeneration = () => {
 
     setIsGenerating(true);
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      // Call backend content generation endpoint
+      const response = await fetch('/api/generate-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          topic: topic,
+          tone: tone
+        }),
+      });
 
-    // Simulate Text Generation
-    const masterDraft = `## The Future of ${topic} in a Digital World\n\nIn today's rapidly evolving landscape, the role of ${topic} has never been more critical. The shift towards digital consumption, amplified by AI and high-speed networks, demands a nuanced and adaptable approach.\n\n### Key Insight: Tone is King\nThe requested tone, '${tone}', is essential for resonating with the target audience. This long-form draft provides foundational paragraphs suitable for deep diving into the subject matter. It's ready for platform-specific tailoring and deployment.\n\n---\n\n**Actionable Takeaway:** We must leverage data-driven insights to maintain editorial consistency. The Ghostwriter platform guarantees style adherence across all channels.\n\n*Keywords: ${topic}, Content Strategy, Digital Transformation, ${tone}*`;
+      if (!response.ok) {
+        throw new Error('Failed to generate content from backend');
+      }
 
-    const linkedInDraft = `💡 Key Takeaway: The digital revolution makes ${topic} more vital than ever. Leveraging a '${tone}' approach, we ensure our content maintains credibility and authority online. Are you ready for AI-driven content consistency?\n\n#${topic.replace(/\s/g, '')} #ContentStrategy #AI #DigitalMarketing`;
-    
-    const wordPressDraft = `<h1>The Definitive Guide to ${topic} Mastery</h1>\n\n<p>This comprehensive guide delves into the specifics of navigating the ${topic} landscape. Given the '${tone}' requirement, we focus on factual, actionable advice.</p>\n\n<p>Use this detailed draft as the body for your next pillar content piece.</p>`;
+      const data = await response.json();
+      
+      // Use structured outputs from backend
+      if (data.outputs) {
+        setContentOutputs(data.outputs);
+      } else {
+        // Fallback if backend doesn't return structured data
+        const agentResult = data.result || '';
+        const outputs: ContentOutputs = {
+          master: `## ${topic}\n\n${agentResult}\n\n**Generated with tone: ${tone}**`,
+          linkedin: `💡 ${topic}\n\n${agentResult.substring(0, 200)}...\n\n#${topic.replace(/\s/g, '')} #ContentStrategy #AI`,
+          wordpress: `<h1>${topic}</h1>\n\n<p>${agentResult}</p>`,
+          instagram: `🔥 ${topic}!\n\n${agentResult.substring(0, 150)}...\n\n#${topic.split(' ')[0]} #AIContent`,
+        };
+        setContentOutputs(outputs);
+      }
 
-    const instagramDraft = `🔥 Trending Topic: ${topic}! The digital landscape demands a '${tone}' voice to stand out. We've got the draft that keeps your brand authoritative and consistent. Check out the link in bio for the full story!\n\n#${topic.split(' ')[0]} #AIAssisted #ContentGoals`;
+      setIsGenerating(false);
 
-    const outputs: ContentOutputs = {
-      master: masterDraft,
-      linkedin: linkedInDraft,
-      wordpress: wordPressDraft,
-      instagram: instagramDraft,
-    };
-
-    setContentOutputs(outputs);
-    setIsGenerating(false);
-
-    return `Master Drafts processed successfully for topic: "${topic}"! Now generate your visuals.`;
+      return `Content generated successfully for topic: "${topic}"! Now generate your visuals.`;
+    } catch (error) {
+      setIsGenerating(false);
+      throw error;
+    }
   };
 
   const clearContent = () => {

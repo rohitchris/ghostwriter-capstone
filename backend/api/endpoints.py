@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any
 import asyncio
 import sys
 import os
+from datetime import datetime
 
 # Add project root to path for agent imports
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
@@ -40,6 +41,41 @@ class ImageGenerationRequest(BaseModel):
 class AgentRunRequest(BaseModel):
     topic: str
     prompt: Optional[str] = None
+
+
+class ContentGenerationRequest(BaseModel):
+    topic: str
+    tone: Optional[str] = "Informative and Professional"
+
+
+class ScheduledPostRequest(BaseModel):
+    user_id: str
+    platform: str
+    content: str
+    date_time: str
+    image_url: Optional[str] = None
+
+
+class ScheduledPostsRequest(BaseModel):
+    user_id: str
+
+
+# Chatbot models
+
+# Session-aware chat models
+class ChatRequest(BaseModel):
+    brand_info: Optional[str] = None
+    message: Optional[str] = None
+    session_id: Optional[str] = None
+    history: Optional[list] = None  # Optional explicit history from frontend
+
+
+
+class ChatResponse(BaseModel):
+    reply: str
+    follow_up: Optional[str] = None
+    session_id: Optional[str] = None
+    history: Optional[list] = None
 
 
 # WordPress Checker Endpoint
@@ -195,4 +231,245 @@ async def run_image_generator(request: Dict[str, Any]):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error running image generator: {str(e)}")
+
+
+@router.post("/generate-content")
+async def generate_content_endpoint(request: ContentGenerationRequest):
+    """Generate structured content for multiple platforms."""
+    try:
+        agent = build_content_creator_agent()
+        from google.adk.runners import InMemoryRunner
+        runner_instance = InMemoryRunner(agent=agent)
+        
+        prompt = f"Create engaging content about {request.topic} with a {request.tone} tone. Generate content suitable for LinkedIn, WordPress blog, and Instagram."
+        result = await runner_instance.run_debug(prompt)
+        
+        # Parse agent result into structured content
+        agent_text = str(result)
+        
+        # Create platform-specific content
+        master = f"## {request.topic}\n\n{agent_text}\n\n**Tone: {request.tone}**"
+        linkedin = f"💡 {request.topic}\n\n{agent_text[:200]}...\n\n#{request.topic.replace(' ', '')} #ContentStrategy #AI"
+        wordpress = f"<h1>{request.topic}</h1>\n\n<p>{agent_text}</p>"
+        instagram = f"🔥 {request.topic}!\n\n{agent_text[:150]}...\n\n#{request.topic.split()[0] if request.topic.split() else 'Content'}"
+        
+        return {
+            "success": True,
+            "outputs": {
+                "master": master,
+                "linkedin": linkedin,
+                "wordpress": wordpress,
+                "instagram": instagram
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generating content: {str(e)}")
+
+
+
+
+
+# Persistent session store (file-based)
+import json
+from pathlib import Path
+_SESSION_DIR = Path("sessions")
+_SESSION_DIR.mkdir(exist_ok=True)
+
+def _load_session(session_id):
+    path = _SESSION_DIR / f"{session_id}.json"
+    if path.exists():
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def _save_session(session_id, history):
+    path = _SESSION_DIR / f"{session_id}.json"
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(history, f)
+    except Exception:
+        pass
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def chat_endpoint(request: ChatRequest):
+    """Brand-aware chatbot endpoint with persistent session/history support.
+
+    - Accepts `session_id` in request (or generates one if missing).
+    - Stores and returns conversation history for multi-turn chat (file-based).
+    - If `brand_info` is missing, returns a prompt asking for brand details.
+    - If `brand_info` is present, uses Google Generative AI if available, else falls back to a template.
+    """
+    import uuid
+    try:
+        # Use provided session_id or generate one
+        session_id = request.session_id or str(uuid.uuid4())
+        history = _load_session(session_id)
+
+        # If explicit history is provided by frontend, use/extend it
+        if request.history:
+            history = request.history
+
+        # If no brand_info, prompt for it
+        if not request.brand_info:
+            reply = (
+                "Thanks — to help with content, please tell me about your brand:"
+                " what you sell, who your audience is, and what tone you prefer."
+            )
+            follow_up = "Please provide a short description of your brand (products/services, audience, tone)."
+            history.append({"role": "assistant", "content": reply})
+            _save_session(session_id, history[-12:])
+            return ChatResponse(reply=reply, follow_up=follow_up, session_id=session_id, history=history)
+
+        # Build prompt from history
+        user_message = request.message or "Please help me with my brand messaging."
+        history.append({"role": "user", "content": user_message})
+
+        # Construct prompt for LLM
+        prompt_lines = []
+        prompt_lines.append("You are a helpful brand assistant. Use the brand information below to respond to the user's message.")
+        prompt_lines.append(f"Brand information: {request.brand_info}")
+        prompt_lines.append("")
+        for turn in history[-6:]:  # last 6 turns
+            prompt_lines.append(f"{turn['role'].capitalize()}: {turn['content']}")
+        prompt_lines.append("")
+        prompt_lines.append("Provide a concise, actionable reply (2-4 short paragraphs) and suggest one follow-up question to clarify the brand further.")
+        prompt_text = "\n".join(prompt_lines)
+
+        # Prefer Google Generative AI if available
+        google_key = os.getenv("GOOGLE_API_KEY")
+        reply = None
+        follow_up = None
+        if google_key:
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=google_key)
+                response = genai.generate_text(model="text-bison-001", input=prompt_text)
+                text = None
+                if hasattr(response, "text") and response.text:
+                    text = response.text
+                else:
+                    try:
+                        text = response.candidates[0].content
+                    except Exception:
+                        text = str(response)
+                reply = text
+                if "?" in text:
+                    parts = [s.strip() for s in text.split("\n") if s.strip()]
+                    for p in reversed(parts):
+                        if "?" in p:
+                            follow_up = p
+                            break
+            except Exception:
+                pass
+
+        if not reply:
+            reply_lines = []
+            reply_lines.append(f"Thanks — here are some quick ideas for your brand:")
+            reply_lines.append(f"Brand summary: {request.brand_info}")
+            reply_lines.append("")
+            reply_lines.append("Suggested messages:")
+            reply_lines.append(f"- Short headline: Try: \"{user_message[:60]}\"")
+            reply_lines.append(f"- Social caption: Speak warmly to your audience and mention benefits; e.g., 'Our {request.brand_info.split()[0]} helps...' ")
+            reply = "\n".join(reply_lines)
+            follow_up = "Would you like a caption in a specific tone (e.g., playful, formal, educational)?"
+
+        history.append({"role": "assistant", "content": reply})
+        _save_session(session_id, history[-12:])
+
+        return ChatResponse(reply=reply, follow_up=follow_up, session_id=session_id, history=history)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error in chat endpoint: {str(e)}")
+
+
+# Scheduled Posts Endpoints
+_POSTS_DIR = Path("scheduled_posts")
+_POSTS_DIR.mkdir(exist_ok=True)
+
+def _load_user_posts(user_id: str):
+    """Load scheduled posts for a user from file."""
+    path = _POSTS_DIR / f"{user_id}.json"
+    if path.exists():
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def _save_user_posts(user_id: str, posts: list):
+    """Save scheduled posts for a user to file."""
+    path = _POSTS_DIR / f"{user_id}.json"
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(posts, f, indent=2)
+    except Exception:
+        pass
+
+
+@router.post("/scheduled-posts/save")
+async def save_scheduled_post(request: ScheduledPostRequest):
+    """Save a scheduled post for a user."""
+    import uuid
+    try:
+        # Load existing posts
+        posts = _load_user_posts(request.user_id)
+        
+        # Create new post
+        new_post = {
+            "id": f"post-{uuid.uuid4()}",
+            "platform": request.platform,
+            "content": request.content,
+            "dateTime": request.date_time,
+            "status": "Scheduled",
+            "imageUrl": request.image_url,
+            "createdAt": datetime.utcnow().isoformat(),
+        }
+        
+        # Add to list
+        posts.append(new_post)
+        
+        # Save back
+        _save_user_posts(request.user_id, posts)
+        
+        return {
+            "success": True,
+            "message": f"Post for {request.platform} successfully scheduled!",
+            "post": new_post
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error saving scheduled post: {str(e)}")
+
+
+@router.post("/scheduled-posts/list")
+async def list_scheduled_posts(request: ScheduledPostsRequest):
+    """Get all scheduled posts for a user."""
+    try:
+        posts = _load_user_posts(request.user_id)
+        return {
+            "success": True,
+            "posts": posts
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching scheduled posts: {str(e)}")
+
+
+@router.delete("/scheduled-posts/{user_id}/{post_id}")
+async def delete_scheduled_post(user_id: str, post_id: str):
+    """Delete a scheduled post."""
+    try:
+        posts = _load_user_posts(user_id)
+        posts = [p for p in posts if p.get("id") != post_id]
+        _save_user_posts(user_id, posts)
+        
+        return {
+            "success": True,
+            "message": "Post deleted successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting scheduled post: {str(e)}")
+
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ScheduledPost } from './useScheduledPosts';
 
 /**
- * Mock hook for scheduled posts - stores in localStorage instead of Firestore
+ * Hook for fetching scheduled posts from backend API
  */
 export const useMockScheduledPosts = (db: any, userId: string | null) => {
   const [scheduledPosts, setScheduledPosts] = useState<ScheduledPost[]>([]);
@@ -13,28 +13,41 @@ export const useMockScheduledPosts = (db: any, userId: string | null) => {
       return;
     }
 
-    // Load from localStorage
-    const loadPosts = () => {
-      const stored = localStorage.getItem(`mock_scheduled_posts_${userId}`);
-      if (stored) {
-        try {
-          const posts = JSON.parse(stored);
-          setScheduledPosts(posts.sort((a: ScheduledPost, b: ScheduledPost) => 
-            new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
-          ));
-        } catch (e) {
-          console.error('Error loading mock posts:', e);
+    // Fetch from backend
+    const loadPosts = async () => {
+      try {
+        const response = await fetch('/api/scheduled-posts/list', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user_id: userId,
+          }),
+        });
+
+        if (!response.ok) {
+          console.error('Failed to fetch scheduled posts');
           setScheduledPosts([]);
+          return;
         }
-      } else {
+
+        const data = await response.json();
+        const posts = data.posts || [];
+        
+        setScheduledPosts(posts.sort((a: ScheduledPost, b: ScheduledPost) => 
+          new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
+        ));
+      } catch (e) {
+        console.error('Error loading scheduled posts:', e);
         setScheduledPosts([]);
       }
     };
 
     loadPosts();
 
-    // Simulate real-time updates by checking localStorage periodically
-    const interval = setInterval(loadPosts, 1000);
+    // Poll for updates every 5 seconds
+    const interval = setInterval(loadPosts, 5000);
 
     return () => clearInterval(interval);
   }, [userId]);
