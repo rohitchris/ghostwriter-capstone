@@ -65,6 +65,20 @@ NANOBANANA_API_URL=https://api.nanobanana.com/v1/generate
 PORT=8000
 ```
 
+5. **Configure Firebase Authentication:**
+
+Create `frontend/.env` file with your Firebase credentials:
+```env
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+```
+
+**See [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for detailed Firebase configuration instructions.**
+
 ---
 
 ## Running the Application
@@ -86,9 +100,10 @@ npm run dev
 
 ### Access the Application
 1. Open http://localhost:5173 in your browser
-2. Sign up or log in (accepts any email/password for demo)
-3. Navigate to `/generator` to create content
-4. View scheduled posts in the Dashboard
+2. **Sign up** with a real email and password (Firebase authentication)
+3. Check your Firebase Console to see the registered user
+4. Navigate to `/generator` to create content
+5. View scheduled posts in the Dashboard
 
 ---
 
@@ -132,14 +147,16 @@ npm run dev
 ## Features
 
 ### ✅ Connected to Backend
+- **Real Firebase Authentication** - Email/password sign-up and login
 - Content generation (AI-powered)
 - Image generation (nanobanana)
 - Scheduled posts (persistent storage)
 - WordPress site verification
 
-### 🔄 Mock/Demo
-- User authentication (accepts any credentials)
-- Social media auto-posting (coming soon)
+### 🔄 Coming Soon
+- Social media auto-posting (LinkedIn, Instagram, Facebook)
+- Email verification for new users
+- Password reset functionality
 
 ---
 
@@ -207,6 +224,13 @@ ghostwriter_agent/
 
 ## Recent Updates (November 2025)
 
+### Firebase Authentication Integration
+- ✅ Replaced mock authentication with real Firebase
+- ✅ Email/password sign-up and login
+- ✅ User session management
+- ✅ Secure authentication state handling
+- ✅ User-friendly error messages
+
 ### Backend Integration
 - ✅ Connected content generation to backend AI agents
 - ✅ Connected image generation to nanobanana API
@@ -218,7 +242,7 @@ ghostwriter_agent/
 - ✅ Updated all hooks to use backend APIs instead of mock data
 - ✅ Real-time polling for scheduled posts updates
 - ✅ Error handling and loading states
-- ✅ Maintained mock authentication for demo purposes
+- ✅ Real Firebase authentication with proper error handling
 
 ---
 
@@ -235,15 +259,29 @@ ghostwriter_agent/
 | `NANOBANANA_API_URL` | Optional | Image generation endpoint |
 | `PORT` | Optional | Backend server port (default: 8000) |
 
+### Firebase Variables (in `frontend/.env`)
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `VITE_FIREBASE_API_KEY` | Yes | Firebase API key |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Yes | Firebase auth domain |
+| `VITE_FIREBASE_PROJECT_ID` | Yes | Firebase project ID |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Yes | Firebase storage bucket |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Yes | Firebase messaging sender ID |
+| `VITE_FIREBASE_APP_ID` | Yes | Firebase app ID |
+
 ---
 
 ## Security & Best Practices
 
-- ✅ `.env` file ignored by git
+- ✅ `.env` files ignored by git (both root and `frontend/.env`)
+- ✅ Firebase authentication with secure password requirements
 - ✅ Use WordPress application passwords (not main password)
 - ✅ Environment variables for all secrets
-- ⚠️ Demo authentication accepts any credentials (replace with real auth for production)
 - ⚠️ File-based storage suitable for demo (use database for production)
+- ⚠️ Enable Firebase Security Rules for production deployments
+
+**For Firebase setup:** See [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for complete instructions.
 
 ---
 

@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BG_DARK } from '../constants/theme';
 import { PRIMARY_BLUE_CLASS, ACCENT_EMERALD_CLASS } from '../constants/theme';
-// import { useFirebase } from '../hooks/useFirebase';
-import { useMockFirebase } from '../hooks/useMockFirebase';
+import { useFirebase } from '../hooks/useFirebase';
 import { useMockScheduledPosts } from '../hooks/useMockScheduledPosts';
 import { useMockSaveScheduledPost } from '../hooks/useMockSaveScheduledPost';
 import { useContentGeneration } from '../hooks/useContentGeneration';
@@ -25,8 +24,8 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
   // Track which platforms have scheduled the CURRENT content
   const [scheduledPlatformsForCurrentContent, setScheduledPlatformsForCurrentContent] = useState<Set<string>>(new Set());
 
-  // Hooks - Using mock versions for testing
-  const { db, userId, isAuthReady, error } = useMockFirebase();
+  // Hooks - Now using real Firebase
+  const { db, userId, isAuthReady, error } = useFirebase();
   const scheduledPosts = useMockScheduledPosts(db, userId);
   const { saveScheduledPost } = useMockSaveScheduledPost(db, userId);
   const {
