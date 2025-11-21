@@ -1,11 +1,11 @@
 from google.adk.agents import LlmAgent
-from ..config import model
+from ..config import imageModel
 
 
 def build_image_generator_agent() -> LlmAgent:
     return LlmAgent(
         name="image_generator",
-        model=model,
+        model=imageModel,
         instruction=(
             "You are an image generation agent for the ghost writer system.\n"
             "You receive image prompts and descriptions from content creators.\n"

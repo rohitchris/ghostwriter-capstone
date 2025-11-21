@@ -219,6 +219,7 @@ ghostwriter_agent/
 - ✅ Real-time polling for scheduled posts updates
 - ✅ Error handling and loading states
 - ✅ Maintained mock authentication for demo purposes
+- ✅ Refreshed the landing-page workflow preview to show the actual signup → platform pick → content/gif timeline cards you provided (screenshots now live under `frontend/public/media/`)
 
 ---
 

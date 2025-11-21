@@ -17,7 +17,7 @@ def build_content_creator_agent() -> LlmAgent:
             "Output JSON: {\n"
             '  "assets": {\n'
             '    "TikTok": {...}, "Instagram": {...}, '
-            '"YouTubeShort": {...}, "LinkedIn": {...}\n'
+            '"YouTubeShort": {...}, "Facebook": {...}\n'
             "  }\n"
             "}"
         ),

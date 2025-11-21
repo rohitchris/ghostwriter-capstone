@@ -47,7 +47,6 @@ export const useMockSaveScheduledPost = (db: any, userId: string | null) => {
         message: data.message || `Post for ${platform} successfully scheduled! View on Dashboard.` 
       };
     } catch (error: any) {
-      console.error("Error saving scheduled post:", error);
       throw new Error(`Failed to schedule post: ${error.message}`);
     }
   }, [userId]);

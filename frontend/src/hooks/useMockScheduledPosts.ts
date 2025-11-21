@@ -27,7 +27,6 @@ export const useMockScheduledPosts = (db: any, userId: string | null) => {
         });
 
         if (!response.ok) {
-          console.error('Failed to fetch scheduled posts');
           setScheduledPosts([]);
           return;
         }
@@ -39,7 +38,6 @@ export const useMockScheduledPosts = (db: any, userId: string | null) => {
           new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()
         ));
       } catch (e) {
-        console.error('Error loading scheduled posts:', e);
         setScheduledPosts([]);
       }
     };
