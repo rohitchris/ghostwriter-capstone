@@ -1,9 +1,8 @@
 import { useState } from 'react';
-import { IMAGE_STYLES, ASPECT_RATIOS } from '../constants/generator';
+import { IMAGE_STYLES } from '../constants/generator';
 
 export interface ImageSettings {
-  prompt: string;
-  linkedin: PlatformImageSettings;
+  facebook: PlatformImageSettings;
   wordpress: PlatformImageSettings;
   instagram: PlatformImageSettings;
 }
@@ -13,14 +12,12 @@ export interface PlatformImageSettings {
   style: string;
   imageDataUrl: string | null;
   generatedUrl: string | null;
-  aspectRatio: string;
 }
 
 const initialImageSettings: ImageSettings = {
-  prompt: '',
-  linkedin: { mode: 'NONE', style: IMAGE_STYLES[0].value, imageDataUrl: null, generatedUrl: null, aspectRatio: '2:1' },
-  wordpress: { mode: 'NONE', style: IMAGE_STYLES[1].value, imageDataUrl: null, generatedUrl: null, aspectRatio: '16:9' },
-  instagram: { mode: 'NONE', style: IMAGE_STYLES[2].value, imageDataUrl: null, generatedUrl: null, aspectRatio: '1:1' },
+  facebook: { mode: 'NONE', style: IMAGE_STYLES[0].value, imageDataUrl: null, generatedUrl: null },
+  wordpress: { mode: 'NONE', style: IMAGE_STYLES[1].value, imageDataUrl: null, generatedUrl: null },
+  instagram: { mode: 'NONE', style: IMAGE_STYLES[2].value, imageDataUrl: null, generatedUrl: null },
 };
 
 export const useImageSettings = () => {
@@ -28,23 +25,26 @@ export const useImageSettings = () => {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
 
   const handleImageSettingChange = (platform: keyof ImageSettings, field: string, value: any) => {
-    if (platform === 'prompt') {
-      setImageSettings(prev => ({ ...prev, prompt: value }));
-    } else {
-      setImageSettings(prev => ({
-        ...prev,
-        [platform]: {
-          ...prev[platform],
-          [field]: value
-        }
-      }));
-    }
+    setImageSettings(prev => ({
+      ...prev,
+      [platform]: {
+        ...prev[platform],
+        [field]: value
+      }
+    }));
   };
 
-  const generateImage = async (platform: 'linkedin' | 'wordpress' | 'instagram') => {
+  const generateImage = async (
+    platform: 'facebook' | 'wordpress' | 'instagram',
+    content: string
+  ) => {
     const settings = imageSettings[platform];
-    if (settings.mode !== 'GENERATE' || !imageSettings.prompt) {
+    if (settings.mode !== 'GENERATE') {
       return;
+    }
+
+    if (!content.trim()) {
+      throw new Error('Content is required to generate an image');
     }
 
     setIsGenerating(true);
@@ -55,23 +55,34 @@ export const useImageSettings = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: imageSettings.prompt,
+          content: content,
+          platform: platform,
           style: settings.style,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to generate image');
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to generate image');
       }
 
       const data = await response.json();
       
-      // Update the platform's generatedUrl with the result
+      // Handle image response - can be URL or base64 data
+      let imageUrl = null;
+      
+      if (data.url || data.image_url) {
+        imageUrl = data.url || data.image_url;
+      } else if (data.image_data) {
+        const imageFormat = data.metadata?.format || 'png';
+        imageUrl = `data:image/${imageFormat};base64,${data.image_data}`;
+      }
+      
       setImageSettings(prev => ({
         ...prev,
         [platform]: {
           ...prev[platform],
-          generatedUrl: data.url || data.image_url || null,
+          generatedUrl: imageUrl,
         }
       }));
 
@@ -83,7 +94,7 @@ export const useImageSettings = () => {
     }
   };
 
-  const isImageGenerationActive = ['linkedin', 'wordpress', 'instagram'].some(
+  const isImageGenerationActive = ['facebook', 'wordpress', 'instagram'].some(
     p => imageSettings[p as keyof ImageSettings]?.mode === 'GENERATE'
   );
 

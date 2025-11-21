@@ -13,7 +13,7 @@ const HeroSection: React.FC = () => {
             </span>
           </h1>
           <p className="text-xl text-slate-300 mb-8 max-w-3xl mx-auto">
-            Ghostwriter automates your content creation across LinkedIn, WordPress, and Instagram. 
+            Ghostwriter automates your content creation across Facebook, WordPress, and Instagram. 
             Create master content, refine for each platform, and schedule posts—all in one powerful workflow.
           </p>
           <div className="flex flex-wrap justify-center gap-4 text-lg text-slate-400">

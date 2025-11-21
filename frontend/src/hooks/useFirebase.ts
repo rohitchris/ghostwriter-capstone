@@ -39,7 +39,6 @@ export const useFirebase = () => {
             await signInAnonymously(authInstance); 
           }
         } catch (authError) {
-          console.error("Firebase Auth Error:", authError);
           await signInAnonymously(authInstance); 
         }
       };
@@ -59,7 +58,6 @@ export const useFirebase = () => {
       return () => unsubscribe();
       
     } catch (e: any) {
-      console.error("Firebase Init Error:", e.message);
       setIsAuthReady(true); 
       setError(`Initialization Failed: ${e.message}`);
     }

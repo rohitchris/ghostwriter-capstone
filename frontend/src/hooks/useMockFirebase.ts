@@ -1,9 +1,28 @@
 import { useState, useEffect } from 'react';
 
+export interface PlatformCredentials {
+  facebook?: {
+    accessToken: string;
+    appId: string;
+    appSecret: string;
+  };
+  wordpress?: {
+    siteUrl: string;
+    username: string;
+    password: string;
+  };
+  instagram?: {
+    accessToken: string;
+    userId: string;
+  };
+}
+
 export interface MockUser {
   userId: string;
   email: string;
   displayName?: string;
+  selectedPlatforms?: string[]; // Array of platform keys: 'facebook', 'wordpress', 'instagram'
+  platformCredentials?: PlatformCredentials; // Stored credentials for connected platforms
 }
 
 /**
@@ -33,7 +52,7 @@ export const useMockFirebase = () => {
             setIsAuthReady(true);
             return;
           } catch (e) {
-            console.error('Error parsing stored user:', e);
+            // Error parsing stored user
           }
         }
       }
@@ -59,6 +78,7 @@ export const useMockFirebase = () => {
       userId: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       email: email,
       displayName: email.split('@')[0],
+      selectedPlatforms: [], // Will be set during platform selection
     };
 
     if (typeof window !== 'undefined') {
@@ -91,6 +111,7 @@ export const useMockFirebase = () => {
       userId: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       email: email,
       displayName: displayName || email.split('@')[0],
+      selectedPlatforms: [], // Will be set during platform selection
     };
 
     if (typeof window !== 'undefined') {
@@ -124,6 +145,40 @@ export const useMockFirebase = () => {
     setError(null);
   };
 
+  const updateUserPlatforms = async (platforms: string[]): Promise<void> => {
+    if (!user) {
+      throw new Error('User must be authenticated to update platforms');
+    }
+
+    const updatedUser: MockUser = {
+      ...user,
+      selectedPlatforms: platforms,
+    };
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('mock_user', JSON.stringify(updatedUser));
+    }
+
+    setUser(updatedUser);
+  };
+
+  const updatePlatformCredentials = async (credentials: PlatformCredentials | null): Promise<void> => {
+    if (!user) {
+      throw new Error('User must be authenticated to update platform credentials');
+    }
+
+    const updatedUser: MockUser = {
+      ...user,
+      platformCredentials: credentials || {},
+    };
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('mock_user', JSON.stringify(updatedUser));
+    }
+
+    setUser(updatedUser);
+  };
+
   return { 
     db, 
     auth, 
@@ -134,5 +189,7 @@ export const useMockFirebase = () => {
     signIn,
     signUp,
     signOut,
+    updateUserPlatforms,
+    updatePlatformCredentials,
   };
 };

@@ -22,7 +22,7 @@ GROQ_USER_PROMPT = (
 
 SAMPLE_RUN_PROMPT = (
     "Run one full GhostWriter cycle: detect trends, create content for "
-    "TikTok, Instagram, YouTubeShort, and LinkedIn, publish (mock or real), "
+    "TikTok, Instagram, YouTubeShort, and Facebook, publish (mock or real), "
     "and evaluate the performance. Brand topic: {topic}."
 )
 

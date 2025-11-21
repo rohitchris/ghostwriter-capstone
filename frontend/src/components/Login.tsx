@@ -27,7 +27,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSwitchToSignUp, error }) => {
     setIsLoading(true);
     try {
       await onLogin(email, password);
-      // Navigate to generator on success
+      // Navigation will be handled by App.tsx based on platform selection
       navigate('/generator');
     } catch (err: any) {
       setLocalError(err.message || 'Failed to sign in. Please try again.');

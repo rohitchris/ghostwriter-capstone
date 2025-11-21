@@ -1,17 +1,14 @@
 import React from 'react';
 import { BG_DARK, BG_MEDIUM } from '../constants/theme';
-import { IMAGE_STYLES, ASPECT_RATIOS, getRatioDetails } from '../constants/generator';
+import { IMAGE_STYLES } from '../constants/generator';
 import { PlatformImageSettings } from '../hooks/useImageSettings';
 
 interface ImageControlPanelProps {
   mode: 'GENERATE' | 'UPLOAD' | 'NONE';
   style: string;
-  aspectRatio: string;
-  imagePrompt: string;
   isGeneratingImage: boolean;
   onModeChange: (mode: 'GENERATE' | 'UPLOAD' | 'NONE') => void;
   onStyleChange: (style: string) => void;
-  onAspectRatioChange: (ratio: string) => void;
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onGenerateImage: () => void;
   platformKey: string;
@@ -20,12 +17,9 @@ interface ImageControlPanelProps {
 const ImageControlPanel: React.FC<ImageControlPanelProps> = ({
   mode,
   style,
-  aspectRatio,
-  imagePrompt,
   isGeneratingImage,
   onModeChange,
   onStyleChange,
-  onAspectRatioChange,
   onFileUpload,
   onGenerateImage,
   platformKey,
@@ -60,40 +54,24 @@ const ImageControlPanel: React.FC<ImageControlPanelProps> = ({
       {/* Conditional Inputs */}
       {mode === 'GENERATE' && (
         <div className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="flex-1 flex flex-col">
-              <label className="text-xs text-slate-400 mb-1">Visual Style:</label>
-              <select
-                value={style}
-                onChange={(e) => onStyleChange(e.target.value)}
-                className={`p-2 ${BG_DARK} border border-slate-600 rounded-lg text-white text-sm`}
-              >
-                {IMAGE_STYLES.map(s => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex-1 flex flex-col">
-              <label className="text-xs text-slate-400 mb-1">Aspect Ratio:</label>
-              <select
-                value={aspectRatio}
-                onChange={(e) => onAspectRatioChange(e.target.value)}
-                className={`p-2 ${BG_DARK} border border-slate-600 rounded-lg text-white text-sm`}
-              >
-                {ASPECT_RATIOS.map(r => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="flex flex-col">
+            <label className="text-xs text-slate-400 mb-1">Visual Style:</label>
+            <select
+              value={style}
+              onChange={(e) => onStyleChange(e.target.value)}
+              className={`p-2 ${BG_DARK} border border-slate-600 rounded-lg text-white text-sm`}
+            >
+              {IMAGE_STYLES.map(s => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
           </div>
           
           <button
             onClick={onGenerateImage}
-            disabled={isGeneratingImage || !imagePrompt.trim()}
+            disabled={isGeneratingImage}
             className={`w-full px-4 py-2 text-sm font-semibold rounded-lg transition ${
               isGeneratingImage 
                 ? 'bg-slate-600 text-slate-400 cursor-not-allowed' 
