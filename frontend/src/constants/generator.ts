@@ -10,7 +10,7 @@ export const IMAGE_STYLES = [
 
 // Aspect Ratio Options
 export const ASPECT_RATIOS = [
-  { value: '2:1', label: '2:1 (Link/Banner, LinkedIn)', size: '1200x600', color: '1e3a8a' },
+  { value: '2:1', label: '2:1 (Link/Banner, Facebook)', size: '1200x600', color: '1e3a8a' },
   { value: '16:9', label: '16:9 (Landscape, WordPress)', size: '1200x675', color: '065f46' },
   { value: '1:1', label: '1:1 (Square, Instagram)', size: '1080x1080', color: 'f97316' },
   { value: '4:5', label: '4:5 (Vertical, Instagram/Pins)', size: '1080x1350', color: '9333ea' },

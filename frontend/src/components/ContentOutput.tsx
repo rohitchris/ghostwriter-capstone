@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BG_DARK, BG_MEDIUM } from '../constants/theme';
 import { BG_SLATE_750 } from '../constants/theme';
-import { getRatioDetails } from '../constants/generator';
 import { PlatformImageSettings, ImageSettings } from '../hooks/useImageSettings';
 import SchedulerModal from './SchedulerModal';
 import ImageControlPanel from './ImageControlPanel';
@@ -11,17 +10,18 @@ interface ContentOutputProps {
   content: string;
   setContent: (content: string) => void;
   colorClass: string;
-  platformKey: 'linkedin' | 'wordpress' | 'instagram';
+  platformKey: 'facebook' | 'wordpress' | 'instagram';
   setGlobalAlert: (message: string) => void;
   imageSettings: PlatformImageSettings;
   handleImageSettingChange: (platform: keyof ImageSettings, field: string, value: any) => void;
+  generateImage: (platform: 'facebook' | 'wordpress' | 'instagram', content: string) => Promise<any>;
   saveScheduledPost: (platform: string, content: string, date: string, timeKey: string, imageUrl: string | null) => void;
-  imagePrompt: string;
+  topic?: string; // Topic for refinement context
   isScheduled?: boolean;
 }
 
 const platformIcons = {
-  linkedin: <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h14zM8 10h2.5v2.5H8V10zm4.5 0h3v2.5h-3V10zM17 10h-2.5v2.5H17V10zM5 10h2.5v2.5H5V10zM8 13.5h2.5v2.5H8v-2.5zm4.5 0h3v2.5h-3v-2.5zM17 13.5h-2.5v2.5H17v-2.5zM5 13.5h2.5v2.5H5v-2.5zm3 3h2.5v2.5H8V16zm4.5 0h3v2.5h-3V16zM17 16h-2.5v2.5H17V16zM5 16h2.5v2.5H5V16zM5 7a2 2 0 00-2 2v2h18V9a2 2 0 00-2-2H5z"/></svg>,
+  facebook: <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>,
   wordpress: <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 18c-4.411 0-8-3.589-8-8s3.589-8 8-8 8 3.589 8 8-3.589 8-8 8zM9.5 7.5C9.5 6.67 8.83 6 8 6S6.5 6.67 6.5 7.5 7.17 9 8 9s1.5-.67 1.5-1.5zM16 17c-2.45 0-4.52-1.75-4.9-4.05L11.5 12c.38-2.3 2.45-4.05 4.9-4.05 2.53 0 4.58 2.05 4.58 4.58S18.53 17 16 17z"/></svg>,
   instagram: <svg className="w-6 h-6 mr-2" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-13a5 5 0 100 10 5 5 0 000-10zm0 8a3 3 0 110-6 3 3 0 010 6zm6.5-7.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/></svg>,
 };
@@ -35,21 +35,22 @@ const ContentOutput: React.FC<ContentOutputProps> = ({
   setGlobalAlert,
   imageSettings,
   handleImageSettingChange,
+  generateImage,
   saveScheduledPost,
-  imagePrompt,
+  topic,
   isScheduled = false,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isRefining, setIsRefining] = useState(false);
+  const [isRefiningContent, setIsRefiningContent] = useState(false);
   const [showScheduler, setShowScheduler] = useState(false);
   const [refinementInstruction, setRefinementInstruction] = useState('');
   const [currentContent, setCurrentContent] = useState(content);
   const [isContentReadyForSchedule, setIsContentReadyForSchedule] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
 
-  const { mode, style, imageDataUrl, generatedUrl, aspectRatio } = imageSettings;
+  const { mode, style, imageDataUrl, generatedUrl } = imageSettings;
   const finalImageUrl = mode === 'GENERATE' ? generatedUrl : (mode === 'UPLOAD' ? imageDataUrl : null);
-  const ratioDetails = getRatioDetails(aspectRatio);
 
   useEffect(() => {
     setCurrentContent(content);
@@ -76,23 +77,48 @@ const ContentOutput: React.FC<ContentOutputProps> = ({
     setIsEditing(false);
   };
 
-  const handleApplyRefinement = () => {
+  const handleApplyRefinement = async () => {
     if (!refinementInstruction.trim()) {
       setGlobalAlert('Please enter a refinement instruction.');
       return;
     }
 
-    const refinement = `\n\n[LLM Refinement applied for ${title} based on: "${refinementInstruction}".]`;
-    const refinedText = currentContent.includes('LLM Refinement') 
-      ? currentContent.replace(/\[LLM Refinement applied.*\]/s, refinement) 
-      : currentContent + refinement;
+    setIsRefiningContent(true);
+    try {
+      // Call backend to regenerate content for this platform
+      const response = await fetch('/api/refine-content', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform: platformKey,
+          current_content: currentContent,
+          refinement_instruction: refinementInstruction,
+          topic: topic || undefined,
+        }),
+      });
 
-    setCurrentContent(refinedText);
-    setRefinementInstruction('');
-    setIsRefining(false);
-    setIsEditing(false);
-    setIsContentReadyForSchedule(true);
-    setGlobalAlert(`${title} content refined and saved! Ready for scheduling.`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to refine content');
+      }
+
+      const data = await response.json();
+      
+      // Update content with refined version
+      setCurrentContent(data.refined_content);
+      setContent(data.refined_content);
+      setRefinementInstruction('');
+      setIsRefining(false);
+      setIsEditing(false);
+      setIsContentReadyForSchedule(true);
+      setGlobalAlert(`${title} content refined and saved! Ready for scheduling.`);
+    } catch (error: any) {
+      setGlobalAlert(`Error refining ${title} content: ${error.message}`);
+    } finally {
+      setIsRefiningContent(false);
+    }
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -118,22 +144,23 @@ const ContentOutput: React.FC<ContentOutputProps> = ({
   };
 
   const handleGenerateImage = async () => {
-    if (!imagePrompt.trim()) {
-      setGlobalAlert('Please enter a descriptive Image Generation Prompt in the main section.');
+    if (!currentContent.trim()) {
+      setGlobalAlert('Please generate content first before creating an image.');
       return;
     }
 
     setIsGeneratingImage(true);
     handleImageSettingChange(platformKey, 'generatedUrl', null);
 
-    await new Promise(resolve => setTimeout(resolve, 2500));
-
-    const mockImageText = `${platformKey} | ${imagePrompt.substring(0, 15)} | ${style.split(' ')[0]} | ${ratioDetails.value}`;
-    const generatedUrl = `https://placehold.co/${ratioDetails.size}/${ratioDetails.color}/ffffff?text=${encodeURIComponent(mockImageText)}`;
-
-    handleImageSettingChange(platformKey, 'generatedUrl', generatedUrl);
-    setIsGeneratingImage(false);
-    setGlobalAlert(`New image visual generated for ${title}!`);
+    try {
+      // Use the generateImage function from the hook (passed as prop)
+      await generateImage(platformKey, currentContent);
+      setGlobalAlert(`New image visual generated for ${title}!`);
+    } catch (error: any) {
+      setGlobalAlert(error.message || `Failed to generate image for ${title}`);
+    } finally {
+      setIsGeneratingImage(false);
+    }
   };
 
   const handleSchedulePost = (platform: string, content: string, date: string, timeKey: string, imageUrl: string | null) => {
@@ -163,8 +190,6 @@ const ContentOutput: React.FC<ContentOutputProps> = ({
       <ImageControlPanel
         mode={mode}
         style={style}
-        aspectRatio={aspectRatio}
-        imagePrompt={imagePrompt}
         isGeneratingImage={isGeneratingImage}
         onModeChange={(newMode) => {
           handleImageSettingChange(platformKey, 'mode', newMode);
@@ -172,7 +197,6 @@ const ContentOutput: React.FC<ContentOutputProps> = ({
           handleImageSettingChange(platformKey, 'generatedUrl', null);
         }}
         onStyleChange={(newStyle) => handleImageSettingChange(platformKey, 'style', newStyle)}
-        onAspectRatioChange={(newRatio) => handleImageSettingChange(platformKey, 'aspectRatio', newRatio)}
         onFileUpload={handleFileUpload}
         onGenerateImage={handleGenerateImage}
         platformKey={platformKey}
@@ -182,7 +206,7 @@ const ContentOutput: React.FC<ContentOutputProps> = ({
       {finalImageUrl || isGeneratingImage ? (
         <div className="mb-4 p-3 bg-slate-700 rounded-xl border border-emerald-500/50">
           <p className="text-xs font-medium text-emerald-400 mb-2">
-            Image Preview (Ratio: {ratioDetails.value})
+            Image Preview
           </p>
           {isGeneratingImage ? (
             <div className="w-full h-48 flex items-center justify-center rounded-lg bg-slate-700/70 border border-dashed border-emerald-400 animate-pulse">
@@ -193,10 +217,9 @@ const ContentOutput: React.FC<ContentOutputProps> = ({
               src={finalImageUrl || ''} 
               alt="Post Visual" 
               className="w-full h-auto rounded-lg object-cover shadow-lg" 
-              style={{ aspectRatio: ratioDetails.value.replace(':', '/') }}
               onError={(e) => {
                 if (mode === 'GENERATE') {
-                  (e.target as HTMLImageElement).src = `https://placehold.co/${ratioDetails.size}/cc3300/ffffff?text=Image+Load+Error`;
+                  (e.target as HTMLImageElement).src = `https://placehold.co/800x600/cc3300/ffffff?text=Image+Load+Error`;
                 }
               }}
             />
@@ -235,9 +258,14 @@ const ContentOutput: React.FC<ContentOutputProps> = ({
           />
           <button 
             onClick={handleApplyRefinement}
-            className="w-full px-4 py-2 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition"
+            disabled={isRefiningContent}
+            className={`w-full px-4 py-2 font-semibold rounded-lg transition ${
+              isRefiningContent
+                ? 'bg-slate-600 text-slate-400 cursor-not-allowed'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+            }`}
           >
-            Apply Refinement
+            {isRefiningContent ? 'Refining Content...' : 'Apply Refinement'}
           </button>
         </div>
       )}

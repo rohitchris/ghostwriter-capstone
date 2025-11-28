@@ -22,10 +22,10 @@ const OutputChannelsSection: React.FC = () => {
             }
           />
 
-          {/* Output 2: Social Micro-Content (LinkedIn/Twitter) */}
+          {/* Output 2: Social Micro-Content (Facebook/Twitter) */}
           <FeatureCard 
             title="Social Micro-Content Campaigns" 
-            description="Generate highly targeted, compliant social posts for professional networks like LinkedIn and X (Twitter). Maintain consistency across all campaigns."
+            description="Generate highly targeted, compliant social posts for networks like Facebook and X (Twitter). Maintain consistency across all campaigns."
             color="emerald"
             icon={
               <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

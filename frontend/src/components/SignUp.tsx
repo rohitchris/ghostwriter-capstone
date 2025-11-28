@@ -39,8 +39,8 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onSwitchToLogin, error }) => 
     setIsLoading(true);
     try {
       await onSignUp(email, password, displayName || undefined);
-      // Navigate to generator on success
-      navigate('/generator');
+      // Navigate to platform selection on success
+      navigate('/platforms');
     } catch (err: any) {
       setLocalError(err.message || 'Failed to create account. Please try again.');
     } finally {

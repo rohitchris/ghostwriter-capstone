@@ -32,7 +32,6 @@ export const useSaveScheduledPost = (db: Firestore | null, userId: string | null
       });
       return { success: true, message: `Post for ${platform} successfully scheduled! View on Dashboard.` };
     } catch (error: any) {
-      console.error("Error saving post to Firestore:", error);
       throw new Error(`Failed to schedule post: ${error.message}`);
     }
   }, [db, userId]);

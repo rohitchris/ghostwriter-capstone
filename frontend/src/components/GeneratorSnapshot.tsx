@@ -1,87 +1,63 @@
 import React from 'react';
-import { BG_DARK, BG_MEDIUM } from '../constants/theme';
-import { PRIMARY_BLUE_CLASS, ACCENT_EMERALD_CLASS } from '../constants/theme';
+import { BG_MEDIUM } from '../constants/theme';
+
+const flowShots = [
+  {
+    title: 'Welcome / Sign In',
+    image: 'landing-flow-3.png',
+    description: 'Enter demo credentials to start the session. Authentication is mocked so the experience is instant.',
+    caption: 'Seamless entry via the “Welcome Back” card.',
+  },
+  {
+    title: 'Pick Platforms',
+    image: 'landing-flow-2.png',
+    description: 'Select Facebook, WordPress, or Instagram—each card highlights the promised outcome before you continue.',
+    caption: 'Every platform is ready in one tap.',
+  },
+  {
+    title: 'Generate Master Content',
+    image: 'landing-flow-1.png',
+    description: 'Type a topic, choose a tone, and tap the big green button. The backend agent fires on `/api/run-agent` immediately.',
+    caption: 'Master prompt → multi-platform drafts.',
+  },
+  {
+    title: 'Refine & Schedule',
+    image: 'landing-flow-4.png',
+    description: 'Fine-tune drafts, attach visuals, and schedule posts. They persist in `scheduled_posts/` while the UI shows a live dashboard.',
+    caption: 'Refine with LLM, then hit “Schedule”.',
+  },
+];
 
 const GeneratorSnapshot: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto">
-      <div className={`${BG_MEDIUM} rounded-2xl p-6 shadow-2xl border border-blue-600/30 overflow-hidden`}>
-        {/* Mock Header */}
-        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-700">
-          <div className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
-            Ghostwriter
-          </div>
-          <div className="flex gap-2">
-            <div className="px-3 py-1 bg-blue-600 text-white text-sm font-semibold rounded">Generator</div>
-            <div className="px-3 py-1 bg-slate-700 text-slate-300 text-sm font-semibold rounded">Scheduled Posts (3)</div>
-          </div>
+      <div className={`${BG_MEDIUM} rounded-2xl p-6 shadow-2xl border border-slate-800 overflow-hidden space-y-6`}>
+        <div>
+          <p className="text-sm uppercase tracking-[0.3em] text-slate-400">New</p>
+          <h2 className="text-3xl font-bold text-white mt-2">Ghostwriter Workflow Preview</h2>
+          <p className="text-slate-300 mt-2 max-w-3xl">
+            No mockups—just the actual journey that sells the simplicity: sign up, choose platforms, generate, refine, and schedule. Each step hits the backend so you can focus on ideas.
+          </p>
         </div>
 
-        {/* Mock Content Generation Section */}
-        <div className={`${BG_DARK} rounded-xl p-6 mb-6 border border-blue-600/50`}>
-          <h3 className="text-xl font-bold mb-4 text-white">1. Master Content Generation</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className={`col-span-2 p-4 ${BG_MEDIUM} border border-blue-600/50 rounded-lg text-slate-400`}>
-              The rise of AI in marketing...
+        <div className="grid gap-6 md:grid-cols-2">
+          {flowShots.map((shot) => (
+            <div key={shot.title} className="rounded-3xl border border-blue-800 bg-slate-950/60 shadow-2xl overflow-hidden flex flex-col">
+              <div className="h-60 w-full overflow-hidden bg-slate-900">
+                <img
+                  src={`/media/${shot.image}`}
+                  alt={shot.title}
+                  className="h-full w-full object-cover object-center"
+                />
+              </div>
+              <div className="p-5 space-y-2">
+                <div className="text-xs uppercase tracking-[0.2em] text-emerald-400">Step</div>
+                <h3 className="text-xl font-semibold text-white">{shot.title}</h3>
+                <p className="text-sm text-slate-300">{shot.description}</p>
+                <p className="text-xs text-slate-500">{shot.caption}</p>
+              </div>
             </div>
-            <div className={`p-4 ${BG_MEDIUM} border border-blue-600/50 rounded-lg text-slate-400`}>
-              Informative and Professional
-            </div>
-          </div>
-          <div className={`w-full px-6 py-4 bg-emerald-500 text-white font-bold rounded-xl text-center`}>
-            Generate Master Content
-          </div>
-        </div>
-
-        {/* Mock Platform Cards */}
-        <div className="grid md:grid-cols-3 gap-4">
-          {/* LinkedIn Card */}
-          <div className={`${BG_DARK} rounded-xl p-4 border-t-4 ${PRIMARY_BLUE_CLASS} shadow-lg`}>
-            <div className="flex items-center mb-3">
-              <div className="w-6 h-6 bg-blue-500 rounded mr-2"></div>
-              <h4 className="text-lg font-semibold text-white">LinkedIn</h4>
-            </div>
-            <div className={`${BG_MEDIUM} rounded-lg p-3 mb-3 text-sm text-slate-300 min-h-[100px]`}>
-              💡 Key Takeaway: The digital revolution makes AI in marketing more vital than ever...
-            </div>
-            <div className="flex gap-2">
-              <div className="px-3 py-1 bg-blue-600 text-white text-xs rounded">Edit</div>
-              <div className="px-3 py-1 bg-slate-700 text-blue-300 text-xs rounded">Refine</div>
-              <div className="px-3 py-1 bg-emerald-500 text-white text-xs rounded">Schedule</div>
-            </div>
-          </div>
-
-          {/* WordPress Card */}
-          <div className={`${BG_DARK} rounded-xl p-4 border-t-4 ${ACCENT_EMERALD_CLASS} shadow-lg`}>
-            <div className="flex items-center mb-3">
-              <div className="w-6 h-6 bg-emerald-500 rounded mr-2"></div>
-              <h4 className="text-lg font-semibold text-white">WordPress</h4>
-            </div>
-            <div className={`${BG_MEDIUM} rounded-lg p-3 mb-3 text-sm text-slate-300 min-h-[100px]`}>
-              &lt;h1&gt;The Definitive Guide to AI in Marketing Mastery&lt;/h1&gt;...
-            </div>
-            <div className="flex gap-2">
-              <div className="px-3 py-1 bg-blue-600 text-white text-xs rounded">Edit</div>
-              <div className="px-3 py-1 bg-slate-700 text-blue-300 text-xs rounded">Refine</div>
-              <div className="px-3 py-1 bg-emerald-500 text-white text-xs rounded">Schedule</div>
-            </div>
-          </div>
-
-          {/* Instagram Card */}
-          <div className={`${BG_DARK} rounded-xl p-4 border-t-4 ${PRIMARY_BLUE_CLASS} shadow-lg`}>
-            <div className="flex items-center mb-3">
-              <div className="w-6 h-6 bg-blue-500 rounded mr-2"></div>
-              <h4 className="text-lg font-semibold text-white">Instagram</h4>
-            </div>
-            <div className={`${BG_MEDIUM} rounded-lg p-3 mb-3 text-sm text-slate-300 min-h-[100px]`}>
-              🔥 Trending Topic: AI in marketing! The digital landscape demands...
-            </div>
-            <div className="flex gap-2">
-              <div className="px-3 py-1 bg-blue-600 text-white text-xs rounded">Edit</div>
-              <div className="px-3 py-1 bg-slate-700 text-blue-300 text-xs rounded">Refine</div>
-              <div className="px-3 py-1 bg-emerald-500 text-white text-xs rounded">Schedule</div>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>

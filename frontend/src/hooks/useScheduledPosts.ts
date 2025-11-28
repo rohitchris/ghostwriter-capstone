@@ -35,7 +35,7 @@ export const useScheduledPosts = (db: Firestore | null, userId: string | null) =
       // Sort posts by date/time ascending
       setScheduledPosts(posts.sort((a, b) => new Date(a.dateTime).getTime() - new Date(b.dateTime).getTime()));
     }, (error) => {
-      console.error("Firestore Snapshot Error:", error);
+      // Firestore snapshot error
     });
 
     return () => unsubscribe();
