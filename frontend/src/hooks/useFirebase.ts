@@ -26,6 +26,12 @@ export const useFirebase = () => {
 
   // Listen for auth state changes
   useEffect(() => {
+    if (!auth) {
+      setIsAuthReady(true);
+      setError('Firebase not initialized - using mock auth');
+      return;
+    }
+    
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser: User | null) => {
       if (firebaseUser) {
         const userData: FirebaseUser = {
@@ -46,6 +52,7 @@ export const useFirebase = () => {
   }, []);
 
   const signIn = async (email: string, password: string): Promise<FirebaseUser> => {
+    if (!auth) throw new Error('Firebase not initialized');
     try {
       setError(null);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -66,6 +73,7 @@ export const useFirebase = () => {
   };
 
   const signUp = async (email: string, password: string, displayName?: string): Promise<FirebaseUser> => {
+    if (!auth) throw new Error('Firebase not initialized');
     try {
       setError(null);
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -91,6 +99,7 @@ export const useFirebase = () => {
   };
 
   const signOut = async (): Promise<void> => {
+    if (!auth) throw new Error('Firebase not initialized');
     try {
       setError(null);
       await firebaseSignOut(auth);
