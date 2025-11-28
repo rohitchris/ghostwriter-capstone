@@ -13,6 +13,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from helpers.wordpress_checker import is_wordpress
+from helpers.threads_api import publish_to_threads, check_threads_connection
+from helpers.facebook_api import publish_to_facebook, check_facebook_connection, get_facebook_pages
 from backend.services.image_generator import generate_image
 
 from ghostwriter_agent.agent import runner
@@ -58,6 +60,20 @@ class ScheduledPostRequest(BaseModel):
 
 class ScheduledPostsRequest(BaseModel):
     user_id: str
+
+
+class ThreadsPublishRequest(BaseModel):
+    user_id: str
+    post_id: str
+    access_token: str
+
+
+class FacebookPublishRequest(BaseModel):
+    user_id: str
+    post_id: str
+    access_token: str
+    page_id: Optional[str] = None
+    page_access_token: Optional[str] = None
 
 
 # Chatbot models
@@ -564,5 +580,156 @@ async def publish_to_wordpress(user_id: str, post_id: str):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error publishing to WordPress: {str(e)}")
+
+
+@router.post("/scheduled-posts/publish-threads")
+async def publish_to_threads_endpoint(request: ThreadsPublishRequest):
+    """Publish a scheduled post to Threads."""
+    try:
+        # Load the post
+        posts = _load_user_posts(request.user_id)
+        post = next((p for p in posts if p.get("id") == request.post_id), None)
+        
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        # Check platform
+        if post.get("platform", "").lower() != "threads":
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Can only publish Threads posts. This is a {post.get('platform')} post."
+            )
+        
+        # Prepare content
+        content = post.get("content", "")
+        image_url = post.get("imageUrl")
+        media_type = "IMAGE" if image_url else "TEXT"
+        
+        # Publish to Threads
+        result = publish_to_threads(
+            text=content,
+            access_token=request.access_token,
+            media_url=image_url,
+            media_type=media_type
+        )
+        
+        if result.get("success"):
+            # Update post status
+            for p in posts:
+                if p.get("id") == request.post_id:
+                    p["status"] = "Published"
+                    p["publishedAt"] = datetime.utcnow().isoformat()
+                    p["threadsUrl"] = result.get("url", "")
+                    p["threadsId"] = result.get("thread_id", "")
+            
+            _save_user_posts(request.user_id, posts)
+            
+            return {
+                "success": True,
+                "message": "Post published to Threads successfully!",
+                "post": next((p for p in posts if p.get("id") == request.post_id), None),
+                "url": result.get("url")
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=result.get("message", "Failed to publish to Threads")
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error publishing to Threads: {str(e)}")
+
+
+@router.post("/scheduled-posts/publish-facebook")
+async def publish_to_facebook_endpoint(request: FacebookPublishRequest):
+    """Publish a scheduled post to Facebook."""
+    try:
+        # Load the post
+        posts = _load_user_posts(request.user_id)
+        post = next((p for p in posts if p.get("id") == request.post_id), None)
+        
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        # Check platform
+        if post.get("platform", "").lower() != "facebook":
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Can only publish Facebook posts. This is a {post.get('platform')} post."
+            )
+        
+        # Prepare content
+        content = post.get("content", "")
+        image_url = post.get("imageUrl")
+        
+        # Publish to Facebook
+        result = publish_to_facebook(
+            message=content,
+            access_token=request.access_token,
+            page_id=request.page_id,
+            page_access_token=request.page_access_token,
+            image_url=image_url
+        )
+        
+        if result.get("success"):
+            # Update post status
+            for p in posts:
+                if p.get("id") == request.post_id:
+                    p["status"] = "Published"
+                    p["publishedAt"] = datetime.utcnow().isoformat()
+                    p["facebookUrl"] = result.get("url", "")
+                    p["facebookId"] = result.get("post_id", "")
+            
+            _save_user_posts(request.user_id, posts)
+            
+            return {
+                "success": True,
+                "message": "Post published to Facebook successfully!",
+                "post": next((p for p in posts if p.get("id") == request.post_id), None),
+                "url": result.get("url")
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=result.get("message", "Failed to publish to Facebook")
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error publishing to Facebook: {str(e)}")
+
+
+@router.get("/check-threads")
+async def check_threads_endpoint(access_token: str):
+    """Check Threads API connection."""
+    try:
+        result = check_threads_connection(access_token)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking Threads connection: {str(e)}")
+
+
+@router.get("/check-facebook")
+async def check_facebook_endpoint(access_token: str):
+    """Check Facebook API connection."""
+    try:
+        result = check_facebook_connection(access_token)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking Facebook connection: {str(e)}")
+
+
+@router.get("/facebook-pages")
+async def get_pages_endpoint(access_token: str):
+    """Get list of Facebook pages managed by the user."""
+    try:
+        result = get_facebook_pages(access_token)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching Facebook pages: {str(e)}")
+
 
 

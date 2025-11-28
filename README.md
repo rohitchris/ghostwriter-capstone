@@ -14,6 +14,8 @@ GhostWriter is a full-stack AI content generation platform that demonstrates the
 - **Image generation** with customizable styles per platform
 - **Scheduled post management** with backend storage
 - **WordPress integration** for direct publishing
+- **Threads publishing** with Meta Threads API
+- **Facebook publishing** to pages and profiles
 - **Brand-aware chatbot** for content strategy assistance
 
 ## Architecture
@@ -63,6 +65,14 @@ WP_PASSWORD=your_wp_app_password
 NANOBANANA_API_KEY=your_nanobanana_key
 NANOBANANA_API_URL=https://api.nanobanana.com/v1/generate
 PORT=8000
+
+# Threads API (Meta)
+THREADS_APP_ID=1393569372162716
+THREADS_APP_SECRET=your_threads_app_secret_here
+
+# Facebook API (Meta)
+FACEBOOK_APP_ID=1166650488940455
+FACEBOOK_APP_SECRET=your_facebook_app_secret_here
 ```
 
 5. **Configure Firebase Authentication:**
@@ -133,6 +143,19 @@ npm run dev
   - Updates post status to "Published"
   - Returns WordPress post URL
 
+- **POST** `/api/scheduled-posts/publish-threads` - Publish to Threads
+  - Body: `{ "user_id": string, "post_id": string, "access_token": string }`
+  - Returns Threads post URL
+  
+- **POST** `/api/scheduled-posts/publish-facebook` - Publish to Facebook
+  - Body: `{ "user_id": string, "post_id": string, "access_token": string, "page_id": string?, "page_access_token": string? }`
+  - Returns Facebook post URL
+
+### Social Media Connections
+- **GET** `/api/check-threads?access_token=TOKEN` - Verify Threads connection
+- **GET** `/api/check-facebook?access_token=TOKEN` - Verify Facebook connection
+- **GET** `/api/facebook-pages?access_token=TOKEN` - List managed Facebook pages
+
 ### WordPress
 - **POST** `/api/check-wordpress` - Verify if a URL is a WordPress site
   - Body: `{ "url": string }`
@@ -157,13 +180,24 @@ npm run dev
 - **Image generation** - nanobanana integration
 - **Scheduled posts** - Persistent storage with dashboard
 - **WordPress auto-publish** - One-click publishing from dashboard
+- **Threads publishing** - Publish to Instagram Threads with access token
+- **Facebook publishing** - Publish to Facebook pages and profiles
 - **WordPress site verification** - Check if a URL is WordPress
 
 ### 🔄 Coming Soon
-- Social media auto-posting (LinkedIn, Instagram, Facebook)
+- OAuth flow for Threads/Facebook tokens
+- Scheduled auto-posting at specific times
+- Social media analytics integration
 - Email verification for new users
 - Password reset functionality
-- Scheduled auto-posting at specific times
+
+---
+
+## Documentation
+
+- **[FIREBASE_SETUP.md](FIREBASE_SETUP.md)** - Complete Firebase authentication setup
+- **[THREADS_FACEBOOK_INTEGRATION.md](THREADS_FACEBOOK_INTEGRATION.md)** - Threads and Facebook API integration guide
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and AI agent workflow
 
 ---
 
