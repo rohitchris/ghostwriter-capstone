@@ -141,24 +141,5 @@ function getFirebaseErrorMessage(errorCode: string): string {
       return 'An error occurred. Please try again.';
   }
 }
-
-        if (user) {
-          setUserId(user.uid);
-        } else {
-          setUserId(null);
-        }
-        setIsAuthReady(true);
-      });
-
-      return () => unsubscribe();
-      
-    } catch (e: any) {
-      console.error("Firebase Init Error:", e.message);
-      setIsAuthReady(true); 
-      setError(`Initialization Failed: ${e.message}`);
-    }
-  }, []);
-
-  return { db, auth, userId, isAuthReady, error };
-};
+ 
 

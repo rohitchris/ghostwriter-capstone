@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BG_DARK } from '../constants/theme';
 import { PRIMARY_BLUE_CLASS, ACCENT_EMERALD_CLASS } from '../constants/theme';
-import { useFirebase } from '../hooks/useFirebase';
+import { useMockFirebase as useFirebase } from '../hooks/useMockFirebase';
 import { useMockScheduledPosts } from '../hooks/useMockScheduledPosts';
 import { useMockSaveScheduledPost } from '../hooks/useMockSaveScheduledPost';
 import { useContentGeneration } from '../hooks/useContentGeneration';
@@ -24,7 +24,7 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
   // Track which platforms have scheduled the CURRENT content
   const [scheduledPlatformsForCurrentContent, setScheduledPlatformsForCurrentContent] = useState<Set<string>>(new Set());
 
-  // Hooks - Now using real Firebase
+  // Hooks - Using mock Firebase
   const { db, userId, isAuthReady, error } = useFirebase();
   const scheduledPosts = useMockScheduledPosts(db, userId);
   const { saveScheduledPost } = useMockSaveScheduledPost(db, userId);
@@ -41,11 +41,12 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
   const {
     imageSettings,
     handleImageSettingChange,
+    generateImage,
     isImageGenerationActive,
   } = useImageSettings();
 
   // Content state setters
-  const [contentLinkedIn, setContentLinkedIn] = useState('');
+  const [contentFacebook, setContentFacebook] = useState('');
   const [contentWordPress, setContentWordPress] = useState('');
   const [contentInstagram, setContentInstagram] = useState('');
 
@@ -56,7 +57,7 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
     try {
       // Clear previous content when regenerating
       clearContent();
-      setContentLinkedIn('');
+      setContentFacebook('');
       setContentWordPress('');
       setContentInstagram('');
       
@@ -65,9 +66,9 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
       
       const message = await generateContentHook();
       // Update content outputs after generation
-      setContentLinkedIn(contentOutputs.linkedin);
-      setContentWordPress(contentOutputs.wordpress);
-      setContentInstagram(contentOutputs.instagram);
+      setContentFacebook(contentOutputs.facebook || '');
+      setContentWordPress(contentOutputs.wordpress || '');
+      setContentInstagram(contentOutputs.instagram || '');
       setAlertMessage(message);
     } catch (error: any) {
       setAlertMessage(error.message);
@@ -76,7 +77,7 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
 
   // Sync content outputs when they change
   useEffect(() => {
-    if (contentOutputs.linkedin) setContentLinkedIn(contentOutputs.linkedin);
+    if (contentOutputs.facebook) setContentFacebook(contentOutputs.facebook);
     if (contentOutputs.wordpress) setContentWordPress(contentOutputs.wordpress);
     if (contentOutputs.instagram) setContentInstagram(contentOutputs.instagram);
   }, [contentOutputs]);
@@ -106,7 +107,7 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
   };
 
   // Check if platforms are scheduled for CURRENT content
-  const isLinkedInScheduled = scheduledPlatformsForCurrentContent.has('linkedin');
+  const isFacebookScheduled = scheduledPlatformsForCurrentContent.has('facebook');
   const isWordPressScheduled = scheduledPlatformsForCurrentContent.has('wordpress');
   const isInstagramScheduled = scheduledPlatformsForCurrentContent.has('instagram');
 
@@ -143,12 +144,9 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
           <MasterContentGenerator
             topic={topic}
             tone={tone}
-            imagePrompt={imageSettings.prompt}
-            isImageGenerationActive={isImageGenerationActive}
             isGenerating={isGenerating}
             onTopicChange={setTopic}
             onToneChange={setTone}
-            onImagePromptChange={(prompt) => handleImageSettingChange('prompt', 'prompt', prompt)}
             onGenerate={handleGenerateContent}
           />
 
@@ -160,17 +158,17 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
 
               <div className="grid lg:grid-cols-3 gap-8">
                 <ContentOutput 
-                  title="LinkedIn"
-                  content={contentLinkedIn}
-                  setContent={setContentLinkedIn}
+                  title="Facebook"
+                  content={contentFacebook}
+                  setContent={setContentFacebook}
                   colorClass={PRIMARY_BLUE_CLASS}
-                  platformKey="linkedin"
+                  platformKey="facebook"
                   setGlobalAlert={setGlobalAlert}
-                  imageSettings={imageSettings.linkedin}
+                  imageSettings={imageSettings.facebook}
                   handleImageSettingChange={handleImageSettingChange}
+                  generateImage={generateImage}
                   saveScheduledPost={handleSaveScheduledPost}
-                  imagePrompt={imageSettings.prompt}
-                  isScheduled={isLinkedInScheduled}
+                  isScheduled={isFacebookScheduled}
                 />
                 
                 <ContentOutput 
@@ -182,8 +180,8 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
                   setGlobalAlert={setGlobalAlert}
                   imageSettings={imageSettings.wordpress}
                   handleImageSettingChange={handleImageSettingChange}
+                  generateImage={generateImage}
                   saveScheduledPost={handleSaveScheduledPost}
-                  imagePrompt={imageSettings.prompt}
                   isScheduled={isWordPressScheduled}
                 />
                 
@@ -196,8 +194,8 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
                   setGlobalAlert={setGlobalAlert}
                   imageSettings={imageSettings.instagram}
                   handleImageSettingChange={handleImageSettingChange}
+                  generateImage={generateImage}
                   saveScheduledPost={handleSaveScheduledPost}
-                  imagePrompt={imageSettings.prompt}
                   isScheduled={isInstagramScheduled}
                 />
               </div>
