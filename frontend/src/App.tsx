@@ -7,7 +7,7 @@ import Login from './components/Login'
 import SignUp from './components/SignUp'
 import ProtectedRoute from './components/ProtectedRoute'
 import PublicRoute from './components/PublicRoute'
-import { useMockFirebase as useFirebase } from './hooks/useMockFirebase'
+import { useAuth as useFirebase } from './hooks/useAuth'
 
 function App() {
   const { isAuthReady, signIn, signUp, signOut, error: authError } = useFirebase();

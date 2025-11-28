@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BG_DARK } from '../constants/theme';
 import { PRIMARY_BLUE_CLASS, ACCENT_EMERALD_CLASS } from '../constants/theme';
-import { useMockFirebase as useFirebase } from '../hooks/useMockFirebase';
+import { useAuth as useFirebase } from '../hooks/useAuth';
 import { useMockScheduledPosts } from '../hooks/useMockScheduledPosts';
 import { useMockSaveScheduledPost } from '../hooks/useMockSaveScheduledPost';
 import { useContentGeneration } from '../hooks/useContentGeneration';
