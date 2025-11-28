@@ -1,12 +1,12 @@
 import { Navigate } from 'react-router-dom';
-import { useMockFirebase } from '../hooks/useMockFirebase';
+import { useAuth } from '../hooks/useAuth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { userId, isAuthReady } = useMockFirebase();
+  const { userId, isAuthReady } = useAuth();
 
   if (!isAuthReady) {
     return (
