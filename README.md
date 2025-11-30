@@ -14,6 +14,8 @@ GhostWriter is a full-stack AI content generation platform that demonstrates the
 - **Image generation** with customizable styles per platform
 - **Scheduled post management** with backend storage
 - **WordPress integration** for direct publishing
+- **Threads publishing** with Meta Threads API
+- **Facebook publishing** to pages and profiles
 - **Brand-aware chatbot** for content strategy assistance
 
 ## Architecture
@@ -63,7 +65,29 @@ WP_PASSWORD=your_wp_app_password
 NANOBANANA_API_KEY=your_nanobanana_key
 NANOBANANA_API_URL=https://api.nanobanana.com/v1/generate
 PORT=8000
+
+# Threads API (Meta)
+THREADS_APP_ID=1393569372162716
+THREADS_APP_SECRET=your_threads_app_secret_here
+
+# Facebook API (Meta)
+FACEBOOK_APP_ID=1166650488940455
+FACEBOOK_APP_SECRET=your_facebook_app_secret_here
 ```
+
+5. **Configure Firebase Authentication:**
+
+Create `frontend/.env` file with your Firebase credentials:
+```env
+VITE_FIREBASE_API_KEY=your_firebase_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+```
+
+**See [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for detailed Firebase configuration instructions.**
 
 ---
 
@@ -86,9 +110,10 @@ npm run dev
 
 ### Access the Application
 1. Open http://localhost:5173 in your browser
-2. Sign up or log in (accepts any email/password for demo)
-3. Navigate to `/generator` to create content
-4. View scheduled posts in the Dashboard
+2. **Sign up** with a real email and password (Firebase authentication)
+3. Check your Firebase Console to see the registered user
+4. Navigate to `/generator` to create content
+5. View scheduled posts in the Dashboard
 
 ---
 
@@ -113,6 +138,24 @@ npm run dev
   
 - **DELETE** `/api/scheduled-posts/{user_id}/{post_id}` - Delete a scheduled post
 
+- **POST** `/api/scheduled-posts/publish-wordpress/{user_id}/{post_id}` - Publish a WordPress post directly
+  - Requires: `WP_SITE`, `WP_USER`, `WP_PASSWORD` in `.env`
+  - Updates post status to "Published"
+  - Returns WordPress post URL
+
+- **POST** `/api/scheduled-posts/publish-threads` - Publish to Threads
+  - Body: `{ "user_id": string, "post_id": string, "access_token": string }`
+  - Returns Threads post URL
+  
+- **POST** `/api/scheduled-posts/publish-facebook` - Publish to Facebook
+  - Body: `{ "user_id": string, "post_id": string, "access_token": string, "page_id": string?, "page_access_token": string? }`
+  - Returns Facebook post URL
+
+### Social Media Connections
+- **GET** `/api/check-threads?access_token=TOKEN` - Verify Threads connection
+- **GET** `/api/check-facebook?access_token=TOKEN` - Verify Facebook connection
+- **GET** `/api/facebook-pages?access_token=TOKEN` - List managed Facebook pages
+
 ### WordPress
 - **POST** `/api/check-wordpress` - Verify if a URL is a WordPress site
   - Body: `{ "url": string }`
@@ -132,14 +175,29 @@ npm run dev
 ## Features
 
 ### ✅ Connected to Backend
-- Content generation (AI-powered)
-- Image generation (nanobanana)
-- Scheduled posts (persistent storage)
-- WordPress site verification
+- **Real Firebase Authentication** - Email/password sign-up and login
+- **Content generation** - AI-powered content for all platforms
+- **Image generation** - nanobanana integration
+- **Scheduled posts** - Persistent storage with dashboard
+- **WordPress auto-publish** - One-click publishing from dashboard
+- **Threads publishing** - Publish to Instagram Threads with access token
+- **Facebook publishing** - Publish to Facebook pages and profiles
+- **WordPress site verification** - Check if a URL is WordPress
 
-### 🔄 Mock/Demo
-- User authentication (accepts any credentials)
-- Social media auto-posting (coming soon)
+### 🔄 Coming Soon
+- OAuth flow for Threads/Facebook tokens
+- Scheduled auto-posting at specific times
+- Social media analytics integration
+- Email verification for new users
+- Password reset functionality
+
+---
+
+## Documentation
+
+- **[FIREBASE_SETUP.md](FIREBASE_SETUP.md)** - Complete Firebase authentication setup
+- **[THREADS_FACEBOOK_INTEGRATION.md](THREADS_FACEBOOK_INTEGRATION.md)** - Threads and Facebook API integration guide
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture and AI agent workflow
 
 ---
 
@@ -207,6 +265,20 @@ ghostwriter_agent/
 
 ## Recent Updates (November 2025)
 
+### Firebase Authentication Integration
+- ✅ Replaced mock authentication with real Firebase
+- ✅ Email/password sign-up and login
+- ✅ User session management
+- ✅ Secure authentication state handling
+- ✅ User-friendly error messages
+
+### WordPress Publishing
+- ✅ One-click WordPress publishing from scheduled posts dashboard
+- ✅ Automatic post status updates
+- ✅ WordPress post URL tracking
+- ✅ Delete scheduled posts
+- ✅ Error handling for WordPress API
+
 ### Backend Integration
 - ✅ Connected content generation to backend AI agents
 - ✅ Connected image generation to nanobanana API
@@ -218,8 +290,7 @@ ghostwriter_agent/
 - ✅ Updated all hooks to use backend APIs instead of mock data
 - ✅ Real-time polling for scheduled posts updates
 - ✅ Error handling and loading states
-- ✅ Maintained mock authentication for demo purposes
-- ✅ Refreshed the landing-page workflow preview to show the actual signup → platform pick → content/gif timeline cards you provided (screenshots now live under `frontend/public/media/`)
+- ✅ Real Firebase authentication with proper error handling
 
 ---
 
@@ -236,15 +307,29 @@ ghostwriter_agent/
 | `NANOBANANA_API_URL` | Optional | Image generation endpoint |
 | `PORT` | Optional | Backend server port (default: 8000) |
 
+### Firebase Variables (in `frontend/.env`)
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `VITE_FIREBASE_API_KEY` | Yes | Firebase API key |
+| `VITE_FIREBASE_AUTH_DOMAIN` | Yes | Firebase auth domain |
+| `VITE_FIREBASE_PROJECT_ID` | Yes | Firebase project ID |
+| `VITE_FIREBASE_STORAGE_BUCKET` | Yes | Firebase storage bucket |
+| `VITE_FIREBASE_MESSAGING_SENDER_ID` | Yes | Firebase messaging sender ID |
+| `VITE_FIREBASE_APP_ID` | Yes | Firebase app ID |
+
 ---
 
 ## Security & Best Practices
 
-- ✅ `.env` file ignored by git
+- ✅ `.env` files ignored by git (both root and `frontend/.env`)
+- ✅ Firebase authentication with secure password requirements
 - ✅ Use WordPress application passwords (not main password)
 - ✅ Environment variables for all secrets
-- ⚠️ Demo authentication accepts any credentials (replace with real auth for production)
 - ⚠️ File-based storage suitable for demo (use database for production)
+- ⚠️ Enable Firebase Security Rules for production deployments
+
+**For Firebase setup:** See [FIREBASE_SETUP.md](FIREBASE_SETUP.md) for complete instructions.
 
 ---
 

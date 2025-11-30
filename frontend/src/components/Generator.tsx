@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { BG_DARK } from '../constants/theme';
 import { PRIMARY_BLUE_CLASS, ACCENT_EMERALD_CLASS } from '../constants/theme';
-// import { useFirebase } from '../hooks/useFirebase';
-import { useMockFirebase } from '../hooks/useMockFirebase';
+import { useAuth as useFirebase } from '../hooks/useAuth';
 import { useMockScheduledPosts } from '../hooks/useMockScheduledPosts';
 import { useMockSaveScheduledPost } from '../hooks/useMockSaveScheduledPost';
 import { useContentGeneration } from '../hooks/useContentGeneration';
@@ -20,15 +18,14 @@ interface GeneratorProps {
 }
 
 const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
-  const navigate = useNavigate();
   const [currentView, setCurrentView] = useState<'generator' | 'dashboard'>('generator');
   const [alertMessage, setAlertMessage] = useState('');
 
   // Track which platforms have scheduled the CURRENT content
   const [scheduledPlatformsForCurrentContent, setScheduledPlatformsForCurrentContent] = useState<Set<string>>(new Set());
 
-  // Hooks - Using mock versions for testing
-  const { db, userId, isAuthReady, error, user } = useMockFirebase();
+  // Hooks - Using mock Firebase
+  const { db, userId, isAuthReady, error } = useFirebase();
   const scheduledPosts = useMockScheduledPosts(db, userId);
   const { saveScheduledPost } = useMockSaveScheduledPost(db, userId);
   const {
@@ -45,6 +42,7 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
     imageSettings,
     handleImageSettingChange,
     generateImage,
+    isImageGenerationActive,
   } = useImageSettings();
 
   // Content state setters
@@ -67,7 +65,10 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
       setScheduledPlatformsForCurrentContent(new Set());
       
       const message = await generateContentHook();
-      // Content outputs are synced via useEffect hook
+      // Update content outputs after generation
+      setContentFacebook(contentOutputs.facebook || '');
+      setContentWordPress(contentOutputs.wordpress || '');
+      setContentInstagram(contentOutputs.instagram || '');
       setAlertMessage(message);
     } catch (error: any) {
       setAlertMessage(error.message);
@@ -110,16 +111,6 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
   const isWordPressScheduled = scheduledPlatformsForCurrentContent.has('wordpress');
   const isInstagramScheduled = scheduledPlatformsForCurrentContent.has('instagram');
 
-  // Get selected platforms from user profile
-  const selectedPlatforms = user?.selectedPlatforms || [];
-
-  // Redirect to platform selection if no platforms are selected
-  useEffect(() => {
-    if (isAuthReady && userId && (!selectedPlatforms || selectedPlatforms.length === 0)) {
-      navigate('/platforms');
-    }
-  }, [isAuthReady, userId, selectedPlatforms, navigate]);
-
   if (!isAuthReady) {
     return (
       <div className={`min-h-screen ${BG_DARK} flex items-center justify-center`}>
@@ -134,11 +125,6 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
         <p className="text-xl text-red-400">{error}</p>
       </div>
     );
-  }
-
-  // Don't render if no platforms selected (will redirect)
-  if (!selectedPlatforms || selectedPlatforms.length === 0) {
-    return null;
   }
 
   return (
@@ -170,63 +156,48 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
                 2. Platform-Specific Refinement & Scheduling
               </h2>
 
-              <div className={`grid gap-8 ${
-                selectedPlatforms.length === 1 
-                  ? 'lg:grid-cols-1 max-w-2xl mx-auto' 
-                  : selectedPlatforms.length === 2 
-                  ? 'lg:grid-cols-2 max-w-5xl mx-auto'
-                  : 'lg:grid-cols-3'
-              }`}>
-                    {selectedPlatforms.includes('facebook') && (
-                      <ContentOutput 
-                        title="Facebook"
-                        content={contentFacebook}
-                        setContent={setContentFacebook}
-                        colorClass={PRIMARY_BLUE_CLASS}
-                        platformKey="facebook"
-                        setGlobalAlert={setGlobalAlert}
-                        imageSettings={imageSettings.facebook}
-                        handleImageSettingChange={handleImageSettingChange}
-                        generateImage={generateImage}
-                        saveScheduledPost={handleSaveScheduledPost}
-                        topic={topic}
-                        isScheduled={isFacebookScheduled}
-                      />
-                    )}
-                    
-                    {selectedPlatforms.includes('wordpress') && (
-                      <ContentOutput 
-                        title="WordPress"
-                        content={contentWordPress}
-                        setContent={setContentWordPress}
-                        colorClass={ACCENT_EMERALD_CLASS}
-                        platformKey="wordpress"
-                        setGlobalAlert={setGlobalAlert}
-                        imageSettings={imageSettings.wordpress}
-                        handleImageSettingChange={handleImageSettingChange}
-                        generateImage={generateImage}
-                        saveScheduledPost={handleSaveScheduledPost}
-                        topic={topic}
-                        isScheduled={isWordPressScheduled}
-                      />
-                    )}
-                    
-                    {selectedPlatforms.includes('instagram') && (
-                      <ContentOutput 
-                        title="Instagram"
-                        content={contentInstagram}
-                        setContent={setContentInstagram}
-                        colorClass={PRIMARY_BLUE_CLASS}
-                        platformKey="instagram"
-                        setGlobalAlert={setGlobalAlert}
-                        imageSettings={imageSettings.instagram}
-                        handleImageSettingChange={handleImageSettingChange}
-                        generateImage={generateImage}
-                        saveScheduledPost={handleSaveScheduledPost}
-                        topic={topic}
-                        isScheduled={isInstagramScheduled}
-                      />
-                    )}
+              <div className="grid lg:grid-cols-3 gap-8">
+                <ContentOutput 
+                  title="Facebook"
+                  content={contentFacebook}
+                  setContent={setContentFacebook}
+                  colorClass={PRIMARY_BLUE_CLASS}
+                  platformKey="facebook"
+                  setGlobalAlert={setGlobalAlert}
+                  imageSettings={imageSettings.facebook}
+                  handleImageSettingChange={handleImageSettingChange}
+                  generateImage={generateImage}
+                  saveScheduledPost={handleSaveScheduledPost}
+                  isScheduled={isFacebookScheduled}
+                />
+                
+                <ContentOutput 
+                  title="WordPress"
+                  content={contentWordPress}
+                  setContent={setContentWordPress}
+                  colorClass={ACCENT_EMERALD_CLASS}
+                  platformKey="wordpress"
+                  setGlobalAlert={setGlobalAlert}
+                  imageSettings={imageSettings.wordpress}
+                  handleImageSettingChange={handleImageSettingChange}
+                  generateImage={generateImage}
+                  saveScheduledPost={handleSaveScheduledPost}
+                  isScheduled={isWordPressScheduled}
+                />
+                
+                <ContentOutput 
+                  title="Instagram"
+                  content={contentInstagram}
+                  setContent={setContentInstagram}
+                  colorClass={PRIMARY_BLUE_CLASS}
+                  platformKey="instagram"
+                  setGlobalAlert={setGlobalAlert}
+                  imageSettings={imageSettings.instagram}
+                  handleImageSettingChange={handleImageSettingChange}
+                  generateImage={generateImage}
+                  saveScheduledPost={handleSaveScheduledPost}
+                  isScheduled={isInstagramScheduled}
+                />
               </div>
             </div>
           </section>
@@ -234,7 +205,14 @@ const Generator: React.FC<GeneratorProps> = ({ onSignOut }) => {
       )}
 
       {currentView === 'dashboard' && (
-        <ScheduledPostsDashboard posts={scheduledPosts} />
+        <ScheduledPostsDashboard 
+          posts={scheduledPosts} 
+          userId={userId}
+          onPostUpdated={() => {
+            // Force refresh by re-fetching posts
+            // The hook will automatically update due to polling
+          }}
+        />
       )}
 
       <Footer userId={userId} />

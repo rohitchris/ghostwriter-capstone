@@ -35,14 +35,35 @@ def fetch_trends(brand_topic: str) -> dict:
 
 
 def publish_or_schedule(payload: dict) -> dict:
-    """Mock: pretend to publish/schedule posts and return fake URLs/ids."""
+    """
+    Publish or schedule posts to various platforms including WordPress, Threads, and Facebook.
+    
+    Expected payload structure:
+    {
+        "items": [
+            {
+                "channel": "wordpress|threads|facebook|...",
+                "title": "...",  # For WordPress
+                "content": "...",  # Post content
+                "caption": "...",  # Alternative to content
+                "status": "publish|draft",  # WordPress only
+                "post_to_wp": true,  # Force WordPress posting
+                "access_token": "...",  # For Threads/Facebook
+                "page_id": "...",  # For Facebook pages
+                "page_access_token": "...",  # For Facebook pages
+                "image_url": "...",  # Optional image URL
+                "scheduled_time": "..."  # When to publish
+            }
+        ]
+    }
+    """
     scheduled_items = []
 
     for item in payload.get("items", []):
-        channel = item.get("channel", "unknown")
+        channel = item.get("channel", "unknown").lower()
 
-        # Attempt to post to WordPress when channel indicates it and creds exist
-        if "wordpress" in channel.lower() or item.get("post_to_wp"):
+        # WordPress Publishing
+        if "wordpress" in channel or item.get("post_to_wp"):
             wp_site = os.getenv("WP_SITE")
             wp_user = os.getenv("WP_USER")
             wp_password = os.getenv("WP_PASSWORD")
@@ -69,7 +90,7 @@ def publish_or_schedule(payload: dict) -> dict:
 
                     scheduled_items.append(
                         {
-                            "channel": channel,
+                            "channel": "wordpress",
                             "status": "posted" if resp.status_code in (200, 201) else "error",
                             "response_code": resp.status_code,
                             "response": resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text,
@@ -79,12 +100,108 @@ def publish_or_schedule(payload: dict) -> dict:
                 except Exception as e:
                     scheduled_items.append(
                         {
-                            "channel": channel,
+                            "channel": "wordpress",
                             "status": "error",
                             "note": f"WP post failed: {e}",
                         }
                     )
                     continue
+
+        # Threads Publishing
+        elif "threads" in channel:
+            access_token = item.get("access_token")
+            if access_token:
+                try:
+                    from helpers.threads_api import publish_to_threads
+                    
+                    content = item.get("content") or item.get("caption") or ""
+                    image_url = item.get("image_url")
+                    media_type = "IMAGE" if image_url else "TEXT"
+                    
+                    result = publish_to_threads(
+                        text=content,
+                        access_token=access_token,
+                        media_url=image_url,
+                        media_type=media_type
+                    )
+                    
+                    scheduled_items.append(
+                        {
+                            "channel": "threads",
+                            "status": "posted" if result.get("success") else "error",
+                            "thread_id": result.get("thread_id"),
+                            "url": result.get("url"),
+                            "message": result.get("message"),
+                        }
+                    )
+                    continue
+                except Exception as e:
+                    scheduled_items.append(
+                        {
+                            "channel": "threads",
+                            "status": "error",
+                            "note": f"Threads post failed: {e}",
+                        }
+                    )
+                    continue
+            else:
+                scheduled_items.append(
+                    {
+                        "channel": "threads",
+                        "status": "error",
+                        "note": "Access token required for Threads posting",
+                    }
+                )
+                continue
+
+        # Facebook Publishing
+        elif "facebook" in channel:
+            access_token = item.get("access_token")
+            if access_token:
+                try:
+                    from helpers.facebook_api import publish_to_facebook
+                    
+                    content = item.get("content") or item.get("caption") or ""
+                    image_url = item.get("image_url")
+                    page_id = item.get("page_id")
+                    page_access_token = item.get("page_access_token")
+                    
+                    result = publish_to_facebook(
+                        message=content,
+                        access_token=access_token,
+                        page_id=page_id,
+                        page_access_token=page_access_token,
+                        image_url=image_url
+                    )
+                    
+                    scheduled_items.append(
+                        {
+                            "channel": "facebook",
+                            "status": "posted" if result.get("success") else "error",
+                            "post_id": result.get("post_id"),
+                            "url": result.get("url"),
+                            "message": result.get("message"),
+                        }
+                    )
+                    continue
+                except Exception as e:
+                    scheduled_items.append(
+                        {
+                            "channel": "facebook",
+                            "status": "error",
+                            "note": f"Facebook post failed: {e}",
+                        }
+                    )
+                    continue
+            else:
+                scheduled_items.append(
+                    {
+                        "channel": "facebook",
+                        "status": "error",
+                        "note": "Access token required for Facebook posting",
+                    }
+                )
+                continue
 
         # Default mock scheduling behavior for other channels or missing creds
         scheduled_items.append(
@@ -99,7 +216,7 @@ def publish_or_schedule(payload: dict) -> dict:
     return {
         "status": "success",
         "items": scheduled_items,
-        "note": "Mock publishing used where real posting was unavailable or not configured.",
+        "note": "Publishing attempted. WordPress/Threads/Facebook posts sent when credentials provided, otherwise mock scheduling used.",
     }
 
 

@@ -5,7 +5,6 @@ from typing import Optional, Dict, Any
 import asyncio
 import sys
 import os
-import requests
 from datetime import datetime
 
 # Add project root to path for agent imports
@@ -14,6 +13,9 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from helpers.wordpress_checker import is_wordpress
+from helpers.threads_api import publish_to_threads, check_threads_connection
+from helpers.facebook_api import publish_to_facebook, check_facebook_connection, get_facebook_pages
+from backend.services.image_generator import generate_image
 
 from ghostwriter_agent.agent import runner
 from ghostwriter_agent.sub_agents import (
@@ -34,38 +36,13 @@ class WordPressCheckRequest(BaseModel):
 
 
 class ImageGenerationRequest(BaseModel):
-    content: str
-    platform: str
+    prompt: str
     style: Optional[str] = None
-
-
-class ContentRefinementRequest(BaseModel):
-    platform: str
-    current_content: str
-    refinement_instruction: str
-    topic: Optional[str] = None
 
 
 class AgentRunRequest(BaseModel):
     topic: str
     prompt: Optional[str] = None
-
-
-class WordPressVerifyRequest(BaseModel):
-    site_url: str
-    username: str
-    password: str
-
-
-class FacebookVerifyRequest(BaseModel):
-    access_token: str
-    app_id: str
-    app_secret: str
-
-
-class InstagramVerifyRequest(BaseModel):
-    access_token: str
-    user_id: str
 
 
 class ContentGenerationRequest(BaseModel):
@@ -83,6 +60,20 @@ class ScheduledPostRequest(BaseModel):
 
 class ScheduledPostsRequest(BaseModel):
     user_id: str
+
+
+class ThreadsPublishRequest(BaseModel):
+    user_id: str
+    post_id: str
+    access_token: str
+
+
+class FacebookPublishRequest(BaseModel):
+    user_id: str
+    post_id: str
+    access_token: str
+    page_id: Optional[str] = None
+    page_access_token: Optional[str] = None
 
 
 # Chatbot models
@@ -117,131 +108,10 @@ async def check_wordpress(request: WordPressCheckRequest):
 # Image Generation Endpoint
 @router.post("/generate-image")
 async def generate_image_endpoint(request: ImageGenerationRequest):
-    """Generate an image using gemini-2.5-flash-image model directly based on platform content."""
+    """Generate an image using nanobanana."""
     try:
-        # Get Google API key from NANOBANANA_API_KEY env var (for consistency)
-        # This will actually be your Google API key
-        api_key = os.getenv("NANOBANANA_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        
-        if not api_key:
-            raise HTTPException(status_code=500, detail="API key not configured in environment variables")
-        
-        # Use the image generator agent (Google image model) to create a prompt based on content and platform
-        from ghostwriter_agent.sub_agents.image_generator import build_image_generator_agent
-        from google.adk.runners import InMemoryRunner
-        
-        image_agent = build_image_generator_agent()
-        runner_instance = InMemoryRunner(agent=image_agent)
-        
-        # Create a prompt that includes the content and platform context
-        agent_prompt = (
-            f"Create an image generation prompt for {request.platform} platform content.\n"
-            f"Content: {request.content[:500]}\n"
-            f"Style preference: {request.style or 'default'}\n"
-            f"Generate an optimized image prompt that captures the essence of this content for {request.platform}."
-        )
-        
-        agent_result = await runner_instance.run_debug(agent_prompt)
-        agent_text = str(agent_result)
-        
-        # Extract the refined prompt from agent result (may be JSON or plain text)
-        import json
-        try:
-            # Try to parse as JSON first
-            agent_data = json.loads(agent_text)
-            image_prompt = agent_data.get('refined_prompt', agent_text)
-        except:
-            # If not JSON, use the text directly
-            image_prompt = agent_text
-        
-        
-        # Generate the actual image using gemini-2.5-flash-image directly
-        # Try using the newer google.genai API first, fallback to google-generativeai
-        image_data = None
-        image_url = None
-        
-        try:
-            # Try newer API: from google import genai
-            try:
-                from google import genai as google_genai
-                
-                client = google_genai.Client(api_key=api_key)
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash-image",
-                    contents=[image_prompt],
-                )
-                
-                # Extract image from response
-                if response.candidates and len(response.candidates) > 0:
-                    candidate = response.candidates[0]
-                    if candidate.content and candidate.content.parts:
-                        for part in candidate.content.parts:
-                            if hasattr(part, 'inline_data') and part.inline_data:
-                                image_data = part.inline_data.data
-                            elif hasattr(part, 'image_url') and part.image_url:
-                                image_url = part.image_url
-                
-            except ImportError:
-                # Fallback to google-generativeai package
-                import google.generativeai as genai
-                
-                genai.configure(api_key=api_key)
-                
-                # Use the gemini-2.5-flash-image model to generate the image
-                model = genai.GenerativeModel('gemini-2.5-flash-image')
-                
-                # Generate image with the refined prompt
-                response = model.generate_content(
-                    image_prompt,
-                    generation_config={
-                        "temperature": 0.7,
-                    }
-                )
-                
-                # Extract image from response (google-generativeai format)
-                if hasattr(response, 'candidates') and response.candidates:
-                    candidate = response.candidates[0]
-                    if hasattr(candidate, 'content') and candidate.content:
-                        if hasattr(candidate.content, 'parts'):
-                            for part in candidate.content.parts:
-                                if hasattr(part, 'inline_data') and part.inline_data:
-                                    image_data = part.inline_data.data
-                                elif hasattr(part, 'image_url') and part.image_url:
-                                    image_url = part.image_url
-        
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error generating image with gemini-2.5-flash-image: {str(e)}")
-        
-        # Process and return the result
-        if image_data or image_url:
-            # Convert image_data to base64 if it's bytes
-            import base64
-            image_data_b64 = None
-            if image_data:
-                if isinstance(image_data, bytes):
-                    image_data_b64 = base64.b64encode(image_data).decode('utf-8')
-                else:
-                    image_data_b64 = image_data
-            
-            result = {
-                "success": True,
-                "image_url": image_url,
-                "url": image_url,  # Also include as 'url' for compatibility
-                "image_data": image_data_b64,  # Base64 encoded image data
-                "metadata": {
-                    "model": "gemini-2.5-flash-image",
-                    "platform": request.platform,
-                    "style": request.style
-                }
-            }
-            return result
-        else:
-            raise HTTPException(status_code=500, detail="Failed to generate image: No image data returned from model")
-            
-    except HTTPException:
-        raise
-    except requests.exceptions.RequestException as e:
-        raise HTTPException(status_code=500, detail=f"Request failed: {str(e)}")
+        result = generate_image(request.prompt, request.style)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating image: {str(e)}")
 
@@ -249,232 +119,17 @@ async def generate_image_endpoint(request: ImageGenerationRequest):
 # Agent Endpoints
 @router.post("/agents/run-full-cycle")
 async def run_full_agent_cycle(request: AgentRunRequest):
-    """Run the full GhostWriter agent cycle and return structured platform-specific outputs."""
+    """Run the full GhostWriter agent cycle."""
     try:
         from ghostwriter_agent.prompts import SAMPLE_RUN_PROMPT
-        import json
-        import re
         
-        # Try to import tiktoken, but make it optional
-        try:
-            import tiktoken
-            HAS_TIKTOKEN = True
-        except ImportError:
-            HAS_TIKTOKEN = False
-        
-        # Count tokens in the prompt
         user_prompt = SAMPLE_RUN_PROMPT.format(topic=request.topic)
-        
-        # Use tiktoken if available, otherwise estimate
-        if HAS_TIKTOKEN:
-            try:
-                encoding = tiktoken.get_encoding("cl100k_base")
-                prompt_tokens = len(encoding.encode(user_prompt))
-            except Exception as e:
-                # Fallback: rough estimate (1 token ≈ 4 characters)
-                prompt_tokens = len(user_prompt) // 4
-        else:
-            # Fallback: rough estimate (1 token ≈ 4 characters)
-            prompt_tokens = len(user_prompt) // 4
-        
-        
         result = await runner.run_debug(user_prompt)
-        
-        # Extract actual text content from Event objects
-        def extract_text_from_events(events_result):
-            """Extract text content from ADK Event objects, ignoring function calls and metadata."""
-            text_parts = []
-            
-            # Handle if result is a list of Events
-            if isinstance(events_result, list):
-                # Reverse iterate to get the final responses first (most recent = final output)
-                for event in reversed(events_result):
-                    # Only process model role events (skip user/function responses)
-                    if hasattr(event, 'role') and event.role == 'model':
-                        if hasattr(event, 'content') and event.content:
-                            if hasattr(event.content, 'parts'):
-                                for part in event.content.parts:
-                                    # Extract text content, ignore function calls
-                                    if hasattr(part, 'text') and part.text:
-                                        text_parts.insert(0, part.text)  # Insert at beginning to maintain order
-                                    # Check for dict-like structure
-                                    elif isinstance(part, dict) and 'text' in part:
-                                        text_parts.insert(0, part['text'])
-            # Handle if result is a single Event
-            elif hasattr(events_result, 'content') and events_result.content:
-                if hasattr(events_result.content, 'parts'):
-                    for part in events_result.content.parts:
-                        if hasattr(part, 'text') and part.text:
-                            text_parts.append(part.text)
-                        elif isinstance(part, dict) and 'text' in part:
-                            text_parts.append(part['text'])
-            
-            # Join all text parts
-            extracted_text = "\n\n".join(text_parts) if text_parts else ""
-            
-            # If we didn't get text from Event parts, extract from string representation
-            if not extracted_text or extracted_text.strip() == "" or "Event(" in extracted_text or "Content(" in extracted_text:
-                result_str = str(events_result)
-                
-                # Try to find JSON structure with "assets" (from content_creator)
-                # Look for the JSON structure that contains "assets" key
-                json_match = None
-                
-                # Method 1: Find "assets" and extract balanced JSON around it
-                start_idx = result_str.find('"assets"')
-                if start_idx != -1:
-                    # Find the opening brace before "assets"
-                    brace_start = result_str.rfind('{', 0, start_idx)
-                    if brace_start != -1:
-                        # Count braces to find matching closing brace
-                        brace_count = 0
-                        for i in range(brace_start, len(result_str)):
-                            if result_str[i] == '{':
-                                brace_count += 1
-                            elif result_str[i] == '}':
-                                brace_count -= 1
-                                if brace_count == 0:
-                                    json_match = result_str[brace_start:i+1]
-                                    break
-                
-                # Method 2: Try regex for nested JSON
-                if not json_match:
-                    # More flexible regex that handles nested structures
-                    json_match_obj = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*"assets"[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', result_str, re.DOTALL)
-                    if json_match_obj:
-                        json_match = json_match_obj.group(0)
-                
-                # Method 3: Try to find any complete JSON structure
-                if not json_match:
-                    # Look for any JSON-like structure
-                    json_match_obj = re.search(r'\{[^{}]*"assets"[^{}]*\}', result_str, re.DOTALL)
-                    if json_match_obj:
-                        json_match = json_match_obj.group(0)
-                
-                if json_match:
-                    # Try to parse and validate JSON
-                    try:
-                        json.loads(json_match)  # Validate it's valid JSON
-                        extracted_text = json_match
-                    except json.JSONDecodeError:
-                        extracted_text = json_match  # Use it anyway
-                else:
-                    # Last resort: return empty and let fallback handle it
-                    extracted_text = ""  # Return empty, fallback will handle it
-            
-            return extracted_text
-        
-        # Extract text content from Events
-        agent_text = extract_text_from_events(result)
-        
-        # Helper function to build posting content (caption + hashtags only, no video_script or image_prompt)
-        def build_posting_content(platform_data: dict, platform_name: str, fallback_text: str) -> str:
-            """Extract only what should be posted: caption and hashtags."""
-            # Handle empty dict case
-            if not platform_data or not isinstance(platform_data, dict):
-                return fallback_text
-            
-            caption = platform_data.get("caption", "") or platform_data.get("content", "")
-            hashtags = platform_data.get("hashtags", "")
-            
-            # Format hashtags if they're a list
-            if isinstance(hashtags, list):
-                hashtags = " ".join([f"#{tag.replace('#', '').strip()}" for tag in hashtags if tag])
-            elif hashtags and not hashtags.startswith("#"):
-                # If it's a string but not formatted, add # prefix
-                hashtags = " ".join([f"#{tag.strip()}" for tag in hashtags.split() if tag])
-            
-            # Combine caption and hashtags
-            if caption and hashtags:
-                result = f"{caption}\n\n{hashtags}"
-            elif caption:
-                result = caption
-            elif hashtags:
-                result = hashtags
-            else:
-                result = fallback_text
-            
-            # Ensure we never return empty string
-            return result if result.strip() else fallback_text
-        
-        # Check if agent_text contains Event objects (not useful content)
-        is_event_object = "Event(" in agent_text or "Content(" in agent_text or "Part(" in agent_text or "FunctionCall(" in agent_text
-        
-        # Try to extract structured content from agent result
-        # First, try to parse as JSON if the agent returned structured data
-        try:
-            # Try to find JSON in the result
-            json_match = re.search(r'\{.*"assets".*\}', agent_text, re.DOTALL)
-            if json_match:
-                try:
-                    agent_json = json.loads(json_match.group(0))
-                    assets = agent_json.get("assets", {})
-                    
-                    # Extract platform-specific content from JSON structure
-                    facebook_data = assets.get("Facebook", {}) or assets.get("facebook", {})
-                    wordpress_data = assets.get("WordPress", {}) or assets.get("wordpress", {})
-                    instagram_data = assets.get("Instagram", {}) or assets.get("instagram", {})
-                    
-                    # Extract only posting content (caption + hashtags), exclude video_script and image_prompt
-                    # Use topic-based fallback if we have Event objects
-                    fallback_fb = f"Engaging content about {request.topic} #ContentStrategy" if is_event_object else (agent_text[:200] if agent_text else f"Content about {request.topic}")
-                    fallback_ig = f"Exciting content about {request.topic} #AIContent" if is_event_object else (agent_text[:150] if agent_text else f"Content about {request.topic}")
-                    
-                    facebook = build_posting_content(facebook_data, "Facebook", fallback_fb)
-                    instagram = build_posting_content(instagram_data, "Instagram", fallback_ig)
-                    
-                    # WordPress uses content (long-form), not caption
-                    wordpress_content = wordpress_data.get("content", "") or wordpress_data.get("caption", "")
-                    if not wordpress_content or not wordpress_content.strip() or is_event_object:
-                        wordpress_content = f"Comprehensive article about {request.topic} covering key insights and trends."
-                    wordpress = f"<h1>{request.topic}</h1>\n\n<p>{wordpress_content}</p>"
-                    
-                    # Master content is a summary
-                    master_content = f"## {request.topic}\n\nGenerated content for multiple platforms.\n\n**Generated with tone: Informative and Professional**"
-                except json.JSONDecodeError as e:
-                    raise ValueError("Invalid JSON structure")
-            else:
-                raise ValueError("No JSON structure found")
-        except (json.JSONDecodeError, ValueError, KeyError):
-            # Fallback: Parse text-based agent result OR use topic-based content if Event objects
-            if is_event_object:
-                # Generate useful fallback content based on topic
-                facebook = f"📘 Exciting insights about {request.topic}! Stay ahead of the curve. #ContentStrategy #AI"
-                wordpress = f"<h1>{request.topic}</h1>\n\n<p>In this comprehensive article, we explore {request.topic} and its implications for modern content creation and strategy.</p>"
-                instagram = f"🔥 Discover the latest on {request.topic}! What are your thoughts? #AIContent #Trending"
-                master_content = f"## {request.topic}\n\nContent generated for multiple platforms.\n\n**Generated with tone: Informative and Professional**"
-            else:
-                
-                # Try to extract platform-specific sections from text
-                facebook_match = re.search(r'(?i)(facebook|fb)[:\s]+(.*?)(?=\n\n|\nInstagram|\nWordPress|\nTikTok|$)', agent_text, re.DOTALL)
-                facebook_content = facebook_match.group(2).strip() if facebook_match else None
-                
-                wp_match = re.search(r'(?i)(wordpress|wp|blog)[:\s]+(.*?)(?=\n\n|\nFacebook|\nInstagram|\nTikTok|$)', agent_text, re.DOTALL)
-                wp_content = wp_match.group(2).strip() if wp_match else None
-                
-                ig_match = re.search(r'(?i)(instagram|ig)[:\s]+(.*?)(?=\n\n|\nFacebook|\nWordPress|\nTikTok|$)', agent_text, re.DOTALL)
-                ig_content = ig_match.group(2).strip() if ig_match else None
-                
-                # Create structured outputs (only posting content, no extra formatting)
-                master_content = f"## {request.topic}\n\n{agent_text[:500] if agent_text else 'Content generated.'}\n\n**Generated with tone: Informative and Professional**"
-                facebook = facebook_content if facebook_content and facebook_content.strip() else f"📘 Engaging content about {request.topic} #ContentStrategy"
-                wordpress = f"<h1>{request.topic}</h1>\n\n<p>{wp_content if wp_content and wp_content.strip() else f'Comprehensive article about {request.topic}.'}</p>"
-                instagram = ig_content if ig_content and ig_content.strip() else f"🔥 Exciting content about {request.topic} #AIContent"
-        
         
         return {
             "success": True,
-            "outputs": {
-                "master": master_content,
-                "facebook": facebook,
-                "wordpress": wordpress,
-                "instagram": instagram
-            },
-            "topic": request.topic,
-            "token_usage": {
-                "prompt_tokens": prompt_tokens,
-                "estimated_total": prompt_tokens + (len(str(result)) // 4)  # Rough estimate for response tokens
-            }
+            "result": str(result),
+            "topic": request.topic
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error running agent cycle: {str(e)}")
@@ -602,142 +257,31 @@ async def generate_content_endpoint(request: ContentGenerationRequest):
         from google.adk.runners import InMemoryRunner
         runner_instance = InMemoryRunner(agent=agent)
         
-        prompt = f"Create engaging content about {request.topic} with a {request.tone} tone. Generate content suitable for Facebook, WordPress blog, and Instagram."
+        prompt = f"Create engaging content about {request.topic} with a {request.tone} tone. Generate content suitable for LinkedIn, WordPress blog, and Instagram."
         result = await runner_instance.run_debug(prompt)
-        
         
         # Parse agent result into structured content
         agent_text = str(result)
         
         # Create platform-specific content
         master = f"## {request.topic}\n\n{agent_text}\n\n**Tone: {request.tone}**"
-        facebook = f"📘 {request.topic}\n\n{agent_text[:200]}...\n\n#{request.topic.replace(' ', '')} #ContentStrategy #AI"
+        linkedin = f"💡 {request.topic}\n\n{agent_text[:200]}...\n\n#{request.topic.replace(' ', '')} #ContentStrategy #AI"
         wordpress = f"<h1>{request.topic}</h1>\n\n<p>{agent_text}</p>"
         instagram = f"🔥 {request.topic}!\n\n{agent_text[:150]}...\n\n#{request.topic.split()[0] if request.topic.split() else 'Content'}"
         
-        
-        response = {
+        return {
             "success": True,
             "outputs": {
                 "master": master,
-                "facebook": facebook,
+                "linkedin": linkedin,
                 "wordpress": wordpress,
                 "instagram": instagram
             }
         }
-        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error generating content: {str(e)}")
 
 
-# Content Refinement Endpoint
-@router.post("/refine-content")
-async def refine_content_endpoint(request: ContentRefinementRequest):
-    """Refine/regenerate content for a specific platform based on refinement instruction."""
-    try:
-        from ghostwriter_agent.sub_agents.content_creator import build_content_creator_agent
-        from google.adk.runners import InMemoryRunner
-        import json
-        import re
-        
-        agent = build_content_creator_agent()
-        runner_instance = InMemoryRunner(agent=agent)
-        
-        # Build prompt for platform-specific refinement
-        platform_requirements = {
-            "facebook": "40-250 characters, 1-3 hashtags maximum",
-            "wordpress": "500-2000+ words, proper HTML formatting with headings and paragraphs",
-            "instagram": "up to 2,200 characters (optimal 125), 5-10 hashtags, include emojis"
-        }
-        
-        req = platform_requirements.get(request.platform.lower(), "platform-appropriate format")
-        
-        prompt = (
-            f"Refine the following {request.platform} content based on this instruction: {request.refinement_instruction}\n\n"
-            f"Current content:\n{request.current_content}\n\n"
-            f"Requirements for {request.platform}: {req}\n\n"
-            f"Generate ONLY the refined {request.platform} content (caption + hashtags for social media, or full content for WordPress). "
-            f"Output JSON: {{\"caption\": \"...\", \"hashtags\": [...]}} for social media, or {{\"content\": \"...\"}} for WordPress."
-        )
-        
-        if request.topic:
-            prompt = f"Topic: {request.topic}\n\n{prompt}"
-        
-        result = await runner_instance.run_debug(prompt)
-        
-        # Extract text from Event objects (same as run-full-cycle)
-        def extract_text_from_events(events_result):
-            text_parts = []
-            if isinstance(events_result, list):
-                for event in reversed(events_result):
-                    if hasattr(event, 'role') and event.role == 'model':
-                        if hasattr(event, 'content') and event.content:
-                            if hasattr(event.content, 'parts'):
-                                for part in event.content.parts:
-                                    if hasattr(part, 'text') and part.text:
-                                        text_parts.insert(0, part.text)
-            elif hasattr(events_result, 'content') and events_result.content:
-                if hasattr(events_result.content, 'parts'):
-                    for part in events_result.content.parts:
-                        if hasattr(part, 'text') and part.text:
-                            text_parts.append(part.text)
-            
-            extracted_text = "\n\n".join(text_parts) if text_parts else ""
-            
-            if not extracted_text or "Event(" in extracted_text:
-                result_str = str(events_result)
-                json_match = re.search(r'\{.*?"caption".*?\}|\{.*?"content".*?\}', result_str, re.DOTALL)
-                if json_match:
-                    extracted_text = json_match.group(0)
-                else:
-                    extracted_text = result_str
-            
-            return extracted_text
-        
-        agent_text = extract_text_from_events(result)
-        
-        # Parse the refined content
-        refined_content = ""
-        try:
-            # Try to parse as JSON
-            json_match = re.search(r'\{.*?\}', agent_text, re.DOTALL)
-            if json_match:
-                agent_json = json.loads(json_match.group(0))
-                
-                if request.platform.lower() == "wordpress":
-                    refined_content = agent_json.get("content", "") or agent_json.get("caption", "")
-                else:
-                    # Social media: combine caption and hashtags
-                    caption = agent_json.get("caption", "")
-                    hashtags = agent_json.get("hashtags", "")
-                    
-                    if isinstance(hashtags, list):
-                        hashtags = " ".join([f"#{tag.replace('#', '').strip()}" for tag in hashtags if tag])
-                    elif hashtags and not hashtags.startswith("#"):
-                        hashtags = " ".join([f"#{tag.strip()}" for tag in hashtags.split() if tag])
-                    
-                    if caption and hashtags:
-                        refined_content = f"{caption}\n\n{hashtags}"
-                    elif caption:
-                        refined_content = caption
-                    elif hashtags:
-                        refined_content = hashtags
-        except (json.JSONDecodeError, KeyError):
-            # If not JSON, use the text directly
-            refined_content = agent_text.strip()
-        
-        # Ensure we have content
-        if not refined_content or not refined_content.strip():
-            refined_content = request.current_content  # Fallback to original
-        
-        
-        return {
-            "success": True,
-            "refined_content": refined_content,
-            "platform": request.platform
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error refining content: {str(e)}")
 
 
 
@@ -851,7 +395,6 @@ async def chat_endpoint(request: ChatRequest):
 
         history.append({"role": "assistant", "content": reply})
         _save_session(session_id, history[-12:])
-        
 
         return ChatResponse(reply=reply, follow_up=follow_up, session_id=session_id, history=history)
     except Exception as e:
@@ -935,7 +478,6 @@ async def delete_scheduled_post(user_id: str, post_id: str):
     """Delete a scheduled post."""
     try:
         posts = _load_user_posts(user_id)
-        initial_count = len(posts)
         posts = [p for p in posts if p.get("id") != post_id]
         _save_user_posts(user_id, posts)
         
@@ -947,100 +489,247 @@ async def delete_scheduled_post(user_id: str, post_id: str):
         raise HTTPException(status_code=500, detail=f"Error deleting scheduled post: {str(e)}")
 
 
-# Platform Authentication Endpoints
-@router.post("/platforms/wordpress/verify")
-async def verify_wordpress_credentials(request: WordPressVerifyRequest):
-    """Verify WordPress credentials (mocked for demo)."""
+@router.post("/scheduled-posts/publish-wordpress/{user_id}/{post_id}")
+async def publish_to_wordpress(user_id: str, post_id: str):
+    """Publish a scheduled post to WordPress."""
     try:
-        # Mock verification - simulate API call delay
-        await asyncio.sleep(1)
+        # Get WordPress credentials from environment
+        wp_site = os.getenv("WP_SITE")
+        wp_user = os.getenv("WP_USER")
+        wp_password = os.getenv("WP_PASSWORD")
         
-        # In a real implementation, this would:
-        # 1. Check if the site is WordPress using is_wordpress()
-        # 2. Attempt to authenticate using WordPress REST API
-        # 3. Return success/failure
+        if not all([wp_site, wp_user, wp_password]):
+            raise HTTPException(
+                status_code=400, 
+                detail="WordPress credentials not configured. Please set WP_SITE, WP_USER, and WP_PASSWORD in .env"
+            )
         
-        # For demo purposes, accept any credentials that look valid
-        if not request.site_url or not request.username or not request.password:
-            raise HTTPException(status_code=400, detail="All fields are required")
+        # Load the post
+        posts = _load_user_posts(user_id)
+        post = next((p for p in posts if p.get("id") == post_id), None)
         
-        # Basic validation
-        if not request.site_url.startswith(('http://', 'https://')):
-            raise HTTPException(status_code=400, detail="Invalid site URL format")
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
         
-        if len(request.password) < 8:
-            raise HTTPException(status_code=400, detail="Password appears invalid (too short)")
+        # Only publish WordPress posts
+        if post.get("platform", "").lower() != "wordpress":
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Can only publish WordPress posts. This is a {post.get('platform')} post."
+            )
         
-        return {
-            "success": True,
-            "message": "WordPress credentials verified successfully",
+        # Publish to WordPress
+        import requests
+        from requests.auth import HTTPBasicAuth
+        
+        wp_url = f"{wp_site.rstrip('/')}/wp-json/wp/v2/posts"
+        
+        # Extract title from content or use date
+        content = post.get("content", "")
+        title = content.split('\n')[0][:100] if content else f"Post from {datetime.utcnow().strftime('%B %d, %Y')}"
+        
+        # Remove HTML tags from title if present
+        import re
+        title = re.sub(r'<[^>]+>', '', title).strip()
+        
+        payload_wp = {
+            "title": title,
+            "content": content,
+            "status": "publish",  # or "draft" for testing
         }
+        
+        resp = requests.post(
+            wp_url, 
+            json=payload_wp, 
+            auth=HTTPBasicAuth(wp_user, wp_password),
+            timeout=30
+        )
+        
+        if resp.status_code in (200, 201):
+            # Update post status
+            for p in posts:
+                if p.get("id") == post_id:
+                    p["status"] = "Published"
+                    p["publishedAt"] = datetime.utcnow().isoformat()
+                    if resp.headers.get("content-type", "").startswith("application/json"):
+                        wp_data = resp.json()
+                        p["wordpressUrl"] = wp_data.get("link", "")
+                        p["wordpressId"] = wp_data.get("id", "")
+            
+            _save_user_posts(user_id, posts)
+            
+            return {
+                "success": True,
+                "message": "Post published to WordPress successfully!",
+                "post": next((p for p in posts if p.get("id") == post_id), None)
+            }
+        else:
+            error_detail = resp.text
+            try:
+                error_data = resp.json()
+                error_detail = error_data.get("message", resp.text)
+            except:
+                pass
+            
+            raise HTTPException(
+                status_code=resp.status_code,
+                detail=f"WordPress API error: {error_detail}"
+            )
+            
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error verifying credentials: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error publishing to WordPress: {str(e)}")
 
 
-@router.post("/platforms/facebook/verify")
-async def verify_facebook_credentials(request: FacebookVerifyRequest):
-    """Verify Facebook credentials (mocked for demo)."""
+@router.post("/scheduled-posts/publish-threads")
+async def publish_to_threads_endpoint(request: ThreadsPublishRequest):
+    """Publish a scheduled post to Threads."""
     try:
-        # Mock verification - simulate API call delay
-        await asyncio.sleep(1)
+        # Load the post
+        posts = _load_user_posts(request.user_id)
+        post = next((p for p in posts if p.get("id") == request.post_id), None)
         
-        # In a real implementation, this would:
-        # 1. Verify the access token with Facebook Graph API
-        # 2. Check app_id and app_secret match
-        # 3. Return success/failure
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
         
-        # For demo purposes, accept any credentials that look valid
-        if not request.access_token or not request.app_id or not request.app_secret:
-            raise HTTPException(status_code=400, detail="All fields are required")
+        # Check platform
+        if post.get("platform", "").lower() != "threads":
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Can only publish Threads posts. This is a {post.get('platform')} post."
+            )
         
-        if len(request.access_token) < 10:
-            raise HTTPException(status_code=400, detail="Invalid access token format")
+        # Prepare content
+        content = post.get("content", "")
+        image_url = post.get("imageUrl")
+        media_type = "IMAGE" if image_url else "TEXT"
         
-        if len(request.app_id) < 10:
-            raise HTTPException(status_code=400, detail="Invalid app ID format")
+        # Publish to Threads
+        result = publish_to_threads(
+            text=content,
+            access_token=request.access_token,
+            media_url=image_url,
+            media_type=media_type
+        )
         
-        return {
-            "success": True,
-            "message": "Facebook credentials verified successfully",
-            "app_id": request.app_id,
-        }
+        if result.get("success"):
+            # Update post status
+            for p in posts:
+                if p.get("id") == request.post_id:
+                    p["status"] = "Published"
+                    p["publishedAt"] = datetime.utcnow().isoformat()
+                    p["threadsUrl"] = result.get("url", "")
+                    p["threadsId"] = result.get("thread_id", "")
+            
+            _save_user_posts(request.user_id, posts)
+            
+            return {
+                "success": True,
+                "message": "Post published to Threads successfully!",
+                "post": next((p for p in posts if p.get("id") == request.post_id), None),
+                "url": result.get("url")
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=result.get("message", "Failed to publish to Threads")
+            )
+            
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error verifying credentials: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error publishing to Threads: {str(e)}")
 
 
-@router.post("/platforms/instagram/verify")
-async def verify_instagram_credentials(request: InstagramVerifyRequest):
-    """Verify Instagram credentials (mocked for demo)."""
+@router.post("/scheduled-posts/publish-facebook")
+async def publish_to_facebook_endpoint(request: FacebookPublishRequest):
+    """Publish a scheduled post to Facebook."""
     try:
-        # Mock verification - simulate API call delay
-        await asyncio.sleep(1)
+        # Load the post
+        posts = _load_user_posts(request.user_id)
+        post = next((p for p in posts if p.get("id") == request.post_id), None)
         
-        # In a real implementation, this would:
-        # 1. Verify the access token with Instagram Graph API
-        # 2. Check user_id matches the token
-        # 3. Return success/failure
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
         
-        # For demo purposes, accept any credentials that look valid
-        if not request.access_token or not request.user_id:
-            raise HTTPException(status_code=400, detail="All fields are required")
+        # Check platform
+        if post.get("platform", "").lower() != "facebook":
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Can only publish Facebook posts. This is a {post.get('platform')} post."
+            )
         
-        if len(request.access_token) < 10:
-            raise HTTPException(status_code=400, detail="Invalid access token format")
+        # Prepare content
+        content = post.get("content", "")
+        image_url = post.get("imageUrl")
         
-        return {
-            "success": True,
-            "message": "Instagram credentials verified successfully",
-            "user_id": request.user_id,
-        }
+        # Publish to Facebook
+        result = publish_to_facebook(
+            message=content,
+            access_token=request.access_token,
+            page_id=request.page_id,
+            page_access_token=request.page_access_token,
+            image_url=image_url
+        )
+        
+        if result.get("success"):
+            # Update post status
+            for p in posts:
+                if p.get("id") == request.post_id:
+                    p["status"] = "Published"
+                    p["publishedAt"] = datetime.utcnow().isoformat()
+                    p["facebookUrl"] = result.get("url", "")
+                    p["facebookId"] = result.get("post_id", "")
+            
+            _save_user_posts(request.user_id, posts)
+            
+            return {
+                "success": True,
+                "message": "Post published to Facebook successfully!",
+                "post": next((p for p in posts if p.get("id") == request.post_id), None),
+                "url": result.get("url")
+            }
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=result.get("message", "Failed to publish to Facebook")
+            )
+            
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error verifying credentials: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error publishing to Facebook: {str(e)}")
+
+
+@router.get("/check-threads")
+async def check_threads_endpoint(access_token: str):
+    """Check Threads API connection."""
+    try:
+        result = check_threads_connection(access_token)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking Threads connection: {str(e)}")
+
+
+@router.get("/check-facebook")
+async def check_facebook_endpoint(access_token: str):
+    """Check Facebook API connection."""
+    try:
+        result = check_facebook_connection(access_token)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error checking Facebook connection: {str(e)}")
+
+
+@router.get("/facebook-pages")
+async def get_pages_endpoint(access_token: str):
+    """Get list of Facebook pages managed by the user."""
+    try:
+        result = get_facebook_pages(access_token)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching Facebook pages: {str(e)}")
+
 
 

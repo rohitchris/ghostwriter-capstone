@@ -5,13 +5,12 @@ import Generator from './components/Generator'
 import LandingPage from './components/LandingPage'
 import Login from './components/Login'
 import SignUp from './components/SignUp'
-import PlatformSelection from './components/PlatformSelection'
 import ProtectedRoute from './components/ProtectedRoute'
 import PublicRoute from './components/PublicRoute'
-import { useMockFirebase } from './hooks/useMockFirebase'
+import { useAuth as useFirebase } from './hooks/useAuth'
 
 function App() {
-  const { isAuthReady, signIn, signUp, signOut, updateUserPlatforms, updatePlatformCredentials, user, error: authError } = useMockFirebase();
+  const { isAuthReady, signIn, signUp, signOut, error: authError } = useFirebase();
   const [authErrorState, setAuthErrorState] = useState<string | null>(null);
 
   const handleLogin = async (email: string, password: string) => {
@@ -79,20 +78,6 @@ function App() {
       />
 
       {/* Protected Routes */}
-      <Route 
-        path="/platforms" 
-        element={
-          <ProtectedRoute>
-            <PlatformSelection 
-              onComplete={updateUserPlatforms}
-              onConnectPlatform={updatePlatformCredentials}
-              initialPlatforms={user?.selectedPlatforms || []}
-              initialCredentials={user?.platformCredentials || {}}
-              isSetup={!user?.selectedPlatforms || user.selectedPlatforms.length === 0}
-            />
-          </ProtectedRoute>
-        } 
-      />
       <Route 
         path="/generator" 
         element={
