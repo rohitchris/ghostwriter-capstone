@@ -52,12 +52,14 @@ const ContentOutput: React.FC<ContentOutputProps> = ({
   const { mode, style, imageDataUrl, generatedUrl } = imageSettings;
   const finalImageUrl = mode === 'GENERATE' ? generatedUrl : (mode === 'UPLOAD' ? imageDataUrl : null);
 
+  console.log(`${platformKey} - mode:`, mode, 'generatedUrl:', generatedUrl, 'finalImageUrl:', finalImageUrl);
+
   useEffect(() => {
     setCurrentContent(content);
-    if (content === "") {
-      setIsContentReadyForSchedule(false);
-      setShowScheduler(false);
-    }
+    // Content is ready for scheduling whenever non-empty
+    const ready = !!content && content.trim().length > 0;
+    setIsContentReadyForSchedule(ready);
+    if (!ready) setShowScheduler(false);
   }, [content]);
 
   const handleEdit = () => {
@@ -68,7 +70,8 @@ const ContentOutput: React.FC<ContentOutputProps> = ({
   const handleSave = () => {
     setContent(currentContent);
     setIsEditing(false);
-    setIsContentReadyForSchedule(true);
+    // Mark ready if content is non-empty after save
+    setIsContentReadyForSchedule(!!currentContent && currentContent.trim().length > 0);
     setGlobalAlert(`${title} content saved successfully. Ready to schedule!`);
   };
 
